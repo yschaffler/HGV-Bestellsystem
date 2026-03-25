@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Numpad } from "./Numpad";
+import { UtensilsCrossed } from "lucide-react";
 
 type Props = {
   onNext: (table: number) => void;
@@ -20,19 +21,27 @@ export function TableStep({ onNext, onBack }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      
-      <h1 className="text-2xl font-semibold mb-6">
-        Tisch auswählen
-      </h1>
+    <div className="flex-1 flex flex-col justify-between p-4 pb-8 max-w-md mx-auto w-full">
+      <div className="flex flex-col items-center mt-8">
+        <div className="bg-primary/10 p-4 rounded-full mb-4 text-primary">
+          <UtensilsCrossed className="w-12 h-12" />
+        </div>
 
-      <Numpad value={input} onChange={setInput} maxLength={3} />
+        <h1 className="text-3xl font-bold mb-2 text-center text-foreground tracking-tight">
+          Tisch wählen
+        </h1>
+        <p className="text-muted-foreground mb-8 text-center text-lg">
+          Tischnummer eingeben
+        </p>
 
-      <div className="w-full max-w-xs mt-6 flex gap-2">
+        <Numpad value={input} onChange={setInput} maxLength={3} />
+      </div>
+
+      <div className="mt-8 pt-4 flex gap-4">
         {onBack && (
           <Button
             variant="outline"
-            className="flex-1 h-14"
+            className="flex-1 h-20 text-2xl font-bold rounded-2xl active:scale-95 transition-transform"
             onClick={onBack}
           >
             Zurück
@@ -40,7 +49,7 @@ export function TableStep({ onNext, onBack }: Props) {
         )}
 
         <Button
-          className="flex-1 h-14 text-xl"
+          className="flex-[2] h-20 text-2xl font-bold rounded-2xl active:scale-95 transition-transform"
           onClick={handleSubmit}
           disabled={!table}
         >
