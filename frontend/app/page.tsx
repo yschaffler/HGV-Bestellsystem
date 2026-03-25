@@ -1,9 +1,9 @@
 "use client";
 
+import { LoginStep } from "@/components/LoginStep";
+import { OrderStep } from "@/components/OrderStep";
+import { TableStep } from "@/components/TableStep";
 import { useState } from "react";
-import { LoginStep } from "./components/LoginStep";
-import { OrderStep } from "./components/OrderStep";
-import { TableStep } from "./components/TableStep";
 
 type Step = "login" | "table" | "order";
 
