@@ -3,7 +3,7 @@ services:
     image: docker.io/mysql:latest
     container_name: database
     environment:
-      MYSQL_DATABSE: 'bestellservice'
+      MYSQL_DATABASE: 'bestellservice'
       MYSQL_ROOT_PASSWORD: '###passwort###'
     ports:
       - "3306:3306"
