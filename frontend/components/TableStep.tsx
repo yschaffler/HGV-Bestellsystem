@@ -27,12 +27,9 @@ export function TableStep({ onNext, onBack }: Props) {
           <UtensilsCrossed className="w-12 h-12" />
         </div>
 
-        <h1 className="text-3xl font-bold mb-2 text-center text-foreground tracking-tight">
+        <h1 className="text-3xl font-bold mb-2 text-center text-foreground tracking-tight pb-5">
           Tisch wählen
         </h1>
-        <p className="text-muted-foreground text-center text-lg">
-          Tischnummer eingeben
-        </p>
 
         <Numpad value={input} onChange={setInput} maxLength={3} />
       </div>

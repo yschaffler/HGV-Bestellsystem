@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Receipt, ArrowLeft, RefreshCcw, CheckCircle2, Minus, Plus, Trash2 } from "lucide-react";
 import {
@@ -42,6 +42,8 @@ type Mode = "menu" | "ordering" | "returning" | "checkout";
 export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props) {
   const [mode, setMode] = useState<Mode>("menu");
   const [newItems, setNewItems] = useState<OrderItem[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   const [returnItems, setReturnItems] = useState<OrderItem[]>([]);
 
   // TEMP: statische existierende Bestellungen (später vom Backend)
@@ -51,6 +53,12 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
   ]);
 
   const [checkoutItems, setCheckoutItems] = useState<OrderItem[]>([]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [newItems, returnItems, checkoutItems]);
 
   // TEMP: statische Produkte (später vom Backend)
   const products: Product[] = [
@@ -343,6 +351,7 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                   <p className="text-sm">Noch keine Artikel gebucht</p>
                 </div>
               )}
+              <div ref={scrollRef} />
             </div>
           </div>
 
