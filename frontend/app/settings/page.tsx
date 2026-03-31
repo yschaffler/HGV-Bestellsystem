@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Card,
   CardContent,
@@ -13,24 +12,16 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   Select,
   SelectContent,
@@ -141,7 +132,7 @@ function ProductForm({ initial, categories, onSave, onCancel }: ProductFormProps
 
       <div className="flex flex-col gap-1.5">
         <Label>Kategorie</Label>
-        <Select value={category} onValueChange={setCategory}> 
+        <Select value={category} onValueChange={setCategory}>
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -315,7 +306,7 @@ export default function Settingspage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
 
-            <Tabs value={activeCategory} onValueChange={setActiveCategory}>
+              <Tabs value={activeCategory} onValueChange={setActiveCategory}>
                 <TabsList className="flex flex-wrap h-auto gap-1 w-full">
                   {allCategories.map((cat) => (
                     <TabsTrigger key={cat} value={cat}>
@@ -323,7 +314,7 @@ export default function Settingspage() {
                     </TabsTrigger>
                   ))}
                 </TabsList>
- 
+
                 {allCategories.map((cat) => {
                   const tabProducts =
                     cat === "Alle"
@@ -465,55 +456,55 @@ export default function Settingspage() {
 
         </div>
 
-        
+
         {/* ── Delete Confirmation Dialog ──────────────────────────────────────── */}
         <AlertDialog
-        open={!!deleteDialog}
-        onOpenChange={(open) => !open && setDeleteDialog(null)}
+          open={!!deleteDialog}
+          onOpenChange={(open) => !open && setDeleteDialog(null)}
         >
-        <AlertDialogContent className="max-w-sm">
-            
+          <AlertDialogContent className="max-w-sm">
+
             {/* Content */}
             <div className="flex flex-col items-center text-center gap-4">
-            
-            {/* Icon */}
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10">
-                <Trash2 className="w-6 h-6 text-destructive" />
-            </div>
 
-            {/* Text */}
-            <AlertDialogHeader className="text-center">
+              {/* Icon */}
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10">
+                <Trash2 className="w-6 h-6 text-destructive" />
+              </div>
+
+              {/* Text */}
+              <AlertDialogHeader className="text-center">
                 <AlertDialogTitle className="text-center">
-                {deleteDialog?.type === "product"
+                  {deleteDialog?.type === "product"
                     ? "Produkt löschen?"
                     : "Kategorie löschen?"}
                 </AlertDialogTitle>
 
                 <AlertDialogDescription className="text-center">
-                „
-                <span className="font-medium text-foreground">
+                  „
+                  <span className="font-medium text-foreground">
                     {deleteDialog?.name}
-                </span>
-                “ wird dauerhaft entfernt.
+                  </span>
+                  “ wird dauerhaft entfernt.
                 </AlertDialogDescription>
-            </AlertDialogHeader>
+              </AlertDialogHeader>
             </div>
 
             {/* Actions */}
             <AlertDialogFooter className="flex-row gap-2 sm:justify-center">
-            <AlertDialogCancel className="flex-1">
+              <AlertDialogCancel className="flex-1">
                 Abbrechen
-            </AlertDialogCancel>
+              </AlertDialogCancel>
 
-            <AlertDialogAction
+              <AlertDialogAction
                 onClick={confirmDelete}
                 className="flex-1"
-            >
+              >
                 Löschen
-            </AlertDialogAction>
+              </AlertDialogAction>
             </AlertDialogFooter>
 
-        </AlertDialogContent>
+          </AlertDialogContent>
         </AlertDialog>
       </div>
     </TooltipProvider>
