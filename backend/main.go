@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -44,12 +45,37 @@ func getCategories(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	w.Write(data)
 }
+func addProduct(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
+	if err != nil {
+		log.Printf("error parsing price: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	name := r.FormValue("name")
+	category, err := strconv.Atoi(r.FormValue("category"))
+	if err != nil {
+		log.Printf("error parsing price: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	product := Product{Price: price, Name: name, Category: category}
+	err = insertProduct(product, DB)
+	if err != nil {
+		log.Printf("error inserting into database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
 
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
 	router.HandleFunc("/get/all-categories/", getCategories)
+	router.HandleFunc("/add/product/", addProduct)
 	server := http.Server{Addr: ":8000", Handler: router}
 	log.Println("Listening for requests...")
 	go server.ListenAndServe()
