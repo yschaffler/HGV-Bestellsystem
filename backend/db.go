@@ -41,11 +41,29 @@ func getAllProducts(db *sql.DB) ([]Product, error) {
 	defer rows.Close()
 	for rows.Next() {
 		p := Product{}
-		err := rows.Scan(&p.Product_Id, &p.Price, &p.Name)
+		err := rows.Scan(&p.Product_Id, &p.Price, &p.Name, &p.Category)
 		if err != nil {
 			return []Product{}, fmt.Errorf("failed to scan database response: %v", err)
 		}
 		products = append(products, p)
 	}
 	return products, nil
+}
+
+func getAllCategories(db *sql.DB) ([]Category, error) {
+	var cats []Category
+	rows, err := db.Query("SELECT * FROM produkt_kategorien;")
+	if err != nil {
+		return []Category{}, fmt.Errorf("failed to retrieve categories from database: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		c := Category{}
+		err := rows.Scan(&c.Category_Id, &c.Name)
+		if err != nil {
+			return []Category{}, fmt.Errorf("failed to scan database response: %v", err)
+		}
+		cats = append(cats, c)
+	}
+	return cats, nil
 }

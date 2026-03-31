@@ -28,10 +28,28 @@ func getProducts(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+func getCategories(w http.ResponseWriter, r *http.Request) {
+	categories, err := getAllCategories(DB)
+	if err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(categories)
+	if err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.Write(data)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
+	router.HandleFunc("/get/all-categories/", getCategories)
 	server := http.Server{Addr: ":8000", Handler: router}
 	log.Println("Listening for requests...")
 	go server.ListenAndServe()
