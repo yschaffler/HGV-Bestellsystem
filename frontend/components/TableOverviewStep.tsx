@@ -54,12 +54,6 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
 
   const [checkoutItems, setCheckoutItems] = useState<OrderItem[]>([]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }, [newItems, returnItems, checkoutItems]);
-
   // TEMP: statische Produkte (später vom Backend)
   const products: Product[] = [
     { id: "beer", name: "Bier", category: "Getränke", price: 4.50 },
@@ -89,6 +83,7 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
       return [...prev, { productId: product.id, name: product.name, amount: 1, price: product.price }];
     });
     if (navigator.vibrate) navigator.vibrate(15);
+    handleScroll();
   }
 
   function updateNewItemAmount(productId: string, delta: number) {
@@ -125,6 +120,7 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
       return [...prev, { productId, name, amount: 1, price }];
     });
     if (navigator.vibrate) navigator.vibrate(15);
+    handleScroll();
   }
 
   function updateReturnItemAmount(productId: string, delta: number) {
@@ -163,6 +159,7 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
       return [...prev, { productId, name, amount: 1, price }];
     });
     if (navigator.vibrate) navigator.vibrate(15);
+    handleScroll();
   }
 
   function updateCheckoutItemAmount(productId: string, delta: number) {
@@ -216,6 +213,14 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
     setNewItems([]);
     setMode("menu");
     onBack();
+  }
+
+  function handleScroll() {
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }, 100);
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -465,16 +470,15 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                 {existingOrders.map((p) => {
                   const returnCount = returnItems.find((i) => i.productId === p.productId)?.amount || 0;
                   const remaining = p.amount - returnCount;
-                  
+
                   return (
                     <Button
                       key={p.productId}
                       variant="outline"
-                      className={`relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 active:scale-95 transition-transform shadow-sm border-2 ${
-                        returnCount > 0
+                      className={`relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 active:scale-95 transition-transform shadow-sm border-2 ${returnCount > 0
                           ? "bg-destructive/5 border-destructive/40 text-destructive active:border-destructive"
                           : "bg-background active:border-destructive/60"
-                      }`}
+                        }`}
                       onClick={() => addReturnItem(p.productId, p.name, p.price)}
                       disabled={remaining <= 0}
                     >
@@ -499,11 +503,10 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                 <ArrowLeft className="w-6 h-6" />
               </Button>
               <Button
-                className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${
-                  returnItems.length > 0
+                className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${returnItems.length > 0
                     ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                     : "bg-muted-foreground"
-                }`}
+                  }`}
                 onClick={saldo}
               >
                 <CheckCircle2 className="mr-2 w-6 h-6" />
@@ -530,16 +533,15 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                 {existingOrders.map((p) => {
                   const checkoutCount = checkoutItems.find((i) => i.productId === p.productId)?.amount || 0;
                   const remaining = p.amount - checkoutCount;
-                  
+
                   return (
                     <Button
                       key={p.productId}
                       variant="outline"
-                      className={`relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 active:scale-95 transition-transform shadow-sm border-2 ${
-                        checkoutCount > 0
+                      className={`relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 active:scale-95 transition-transform shadow-sm border-2 ${checkoutCount > 0
                           ? "bg-blue-500/5 border-blue-500/40 text-blue-600 active:border-blue-600"
                           : "bg-background active:border-blue-500/60"
-                      }`}
+                        }`}
                       onClick={() => addCheckoutItem(p.productId, p.name, p.price)}
                       disabled={remaining <= 0}
                     >
@@ -567,11 +569,10 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
-                    className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${
-                      checkoutItems.length > 0
+                    className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${checkoutItems.length > 0
                         ? "bg-blue-600 hover:bg-blue-700 text-white border border-blue-600"
                         : "bg-muted-foreground text-background"
-                    }`}
+                      }`}
                     disabled={checkoutItems.length === 0}
                   >
                     <CheckCircle2 className="mr-2 w-6 h-6" />
