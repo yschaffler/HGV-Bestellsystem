@@ -11,7 +11,7 @@ type HeaderProps = {
 
 export function Header({ waiterId, table, onLogout }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-md mx-auto items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <div className="font-semibold text-sm">

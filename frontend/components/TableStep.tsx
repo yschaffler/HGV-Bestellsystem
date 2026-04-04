@@ -21,23 +21,20 @@ export function TableStep({ onNext, onBack }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col justify-between p-4 pb-8 max-w-md mx-auto w-full">
-      <div className="flex flex-col items-center mt-8">
+    <div className="flex-1 flex flex-col p-4 pb-8 max-w-md mx-auto w-full overflow-y-auto min-h-0">
+      <div className="flex flex-col items-center">
         <div className="bg-primary/10 p-4 rounded-full mb-4 text-primary">
           <UtensilsCrossed className="w-12 h-12" />
         </div>
 
-        <h1 className="text-3xl font-bold mb-2 text-center text-foreground tracking-tight">
+        <h1 className="text-3xl font-bold mb-2 text-center text-foreground tracking-tight pb-5">
           Tisch wählen
         </h1>
-        <p className="text-muted-foreground mb-8 text-center text-lg">
-          Tischnummer eingeben
-        </p>
 
         <Numpad value={input} onChange={setInput} maxLength={3} />
       </div>
 
-      <div className="mt-8 pt-4 flex gap-4">
+      <div className="mt-auto pt-4 flex gap-4">
         {onBack && (
           <Button
             variant="outline"

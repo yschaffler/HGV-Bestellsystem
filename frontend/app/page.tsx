@@ -39,7 +39,7 @@ export default function Page() {
   if (!isLoaded) return null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-muted/20">
+    <div className="h-[100dvh] flex flex-col bg-muted/20 overflow-hidden">
       {waiterId && (
         <Header 
           waiterId={waiterId} 
@@ -48,7 +48,7 @@ export default function Page() {
         />
       )}
       
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-h-0">
         {step === "login" && (
           <LoginStep onNext={handleLogin} />
         )}
