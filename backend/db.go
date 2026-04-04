@@ -51,7 +51,6 @@ func getAllProducts(db *sql.DB) ([]Product, error) {
 }
 
 func insertProduct(p Product, db *sql.DB) error {
-	log.Printf("%v", p)
 	query := fmt.Sprintf("insert into test_produkte (price, name, product_category) values (%v, \"%v\", %v);", p.Price, p.Name, p.Category)
 	_, err := db.Exec(query)
 	if err != nil {

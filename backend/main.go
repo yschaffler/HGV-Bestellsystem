@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 )
@@ -46,7 +45,7 @@ func getCategories(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 func addProduct(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	/*r.ParseForm()
 	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
 	if err != nil {
 		log.Printf("error parsing price: %v", err)
@@ -64,6 +63,20 @@ func addProduct(w http.ResponseWriter, r *http.Request) {
 	err = insertProduct(product, DB)
 	if err != nil {
 		log.Printf("error inserting into database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)*/
+	var p Product
+	err := json.NewDecoder(r.Body).Decode(&p)
+	if err != nil {
+		log.Printf("error decoding product from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	err = insertProduct(p, DB)
+	if err != nil {
+		log.Printf("error inserting product into database: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
