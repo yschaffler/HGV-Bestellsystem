@@ -1,0 +1,28 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bestellsystem-app
+    ports:
+      - "8000:8000"
+    environment:
+      - BESTELLSERVICE_HOST=db
+      - BESTELLSERVICE_PASSWORD=123
+      - BESTELLSERVICE_PORT=3306
+    depends_on:
+      - db
+    restart: always
+
+  db:
+    image: docker.io/mysql:latest
+    container_name: bestellsystem-database
+    environment:
+      MYSQL_DATABASE: 'bestellservice'
+      MYSQL_ROOT_PASSWORD: '123'
+    ports:
+      - "3307:3306"
+    volumes:
+      - F:/Volumes/Bestellservice/database:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d
+    restart: always
