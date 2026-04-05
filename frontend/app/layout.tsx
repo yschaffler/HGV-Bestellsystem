@@ -8,6 +8,13 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "HGV Bestellsystem",
   description: "Ein Informatikprojekt",
+  manifest: "/manifest.json",
+  themeColor: "#000000",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "HGV Bestellsystem"
+  }
 };
 
 export default function RootLayout({

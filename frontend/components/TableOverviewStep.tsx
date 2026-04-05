@@ -22,6 +22,9 @@ type OrderItem = {
   price: number;
 };
 
+type ApiCategory = { category_id: number; category_name: string };
+type ApiProduct = { product_id: number; price: number; name: string; category: number };
+
 type Product = {
   id: string;
   name: string;
@@ -54,15 +57,39 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
 
   const [checkoutItems, setCheckoutItems] = useState<OrderItem[]>([]);
 
-  // TEMP: statische Produkte (später vom Backend)
-  const products: Product[] = [
-    { id: "beer", name: "Bier", category: "Getränke", price: 4.50 },
-    { id: "cola", name: "Cola", category: "Getränke", price: 3.50 },
-    { id: "water", name: "Wasser", category: "Getränke", price: 3.00 },
-    { id: "wine", name: "Wein", category: "Getränke", price: 5.50 },
-    { id: "soda", name: "Spezi", category: "Getränke", price: 3.50 },
-    { id: "apfelschorle", name: "Apfelschorle", category: "Getränke", price: 3.50 },
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const catRes = await fetch("/get/all-categories/");
+        const prodRes = await fetch("/get/all-products/");
+        if (!catRes.ok || !prodRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
+        
+        const catData: ApiCategory[] = await catRes.json();
+        const prodData: ApiProduct[] = await prodRes.json();
+        
+        const catMap = new Map<number, string>();
+        catData.forEach(c => catMap.set(c.category_id, c.category_name));
+        
+        const MAPPED_PRODUCTS: Product[] = prodData.map(p => ({
+          id: p.product_id.toString(),
+          name: p.name,
+          category: catMap.get(p.category) || "Unbekannt",
+          price: p.price,
+        }));
+        setProducts(MAPPED_PRODUCTS);
+      } catch (err) {
+        console.error(err);
+        setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
 
   const existingTotal = existingOrders.reduce((sum, item) => sum + (item.price * item.amount), 0);
   const newTotal = newItems.reduce((sum, item) => sum + (item.price * item.amount), 0);
@@ -227,6 +254,11 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
 
   return (
     <div className="flex-1 flex flex-col w-full min-h-0 bg-muted/10 overflow-hidden">
+      {error && (
+        <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center shrink-0 z-50">
+          ⚠️ {error}
+        </div>
+      )}
 
       {/* Top: Aktuelle Bestellungen */}
       <div className="flex-[3] p-4 flex flex-col overflow-hidden min-h-[40vh] max-h-[50vh]">
@@ -414,26 +446,36 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
         {mode === "ordering" && (
           <div className="p-2 pt-3 flex-1 flex flex-col overflow-hidden h-full">
             <div className="flex-1 overflow-y-auto px-2 pb-2">
-              <div className="grid grid-cols-3 gap-2">
-                {products.map((p) => {
-                  const orderedCount = newItems.find((i) => i.productId === p.id)?.amount || 0;
-                  return (
-                    <Button
-                      key={p.id}
-                      variant="outline"
-                      className="relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 bg-background active:scale-95 transition-transform shadow-sm border-2 active:border-primary"
-                      onClick={() => addNewItem(p)}
-                    >
-                      <span className="break-words px-1 text-center whitespace-normal leading-tight">{p.name}</span>
-                      {orderedCount > 0 && (
-                        <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md">
-                          {orderedCount}
-                        </div>
-                      )}
-                    </Button>
-                  );
-                })}
-              </div>
+              {isLoading ? (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground font-semibold">
+                  Produkte laden...
+                </div>
+              ) : products.length === 0 ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 text-center">
+                  <p>Es sind noch keine Produkte angelegt.<br/>Erstelle im Backend/Settings neue Produkte.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {products.map((p) => {
+                    const orderedCount = newItems.find((i) => i.productId === p.id)?.amount || 0;
+                    return (
+                      <Button
+                        key={p.id}
+                        variant="outline"
+                        className="relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 bg-background active:scale-95 transition-transform shadow-sm border-2 active:border-primary"
+                        onClick={() => addNewItem(p)}
+                      >
+                        <span className="break-words px-1 text-center whitespace-normal leading-tight">{p.name}</span>
+                        {orderedCount > 0 && (
+                          <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md">
+                            {orderedCount}
+                          </div>
+                        )}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="p-2 pt-0 shrink-0 flex gap-2 h-16 mt-2">

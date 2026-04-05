@@ -62,20 +62,9 @@ type DeleteDialog =
   | { type: "category"; name: string }
   | null;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function uid() {
-  return Math.random().toString(36).slice(2, 9);
-}
-
-const DEFAULT_CATEGORIES = ["Getränke", "Speisen", "Desserts", "Sonstiges"];
-
-const INITIAL_PRODUCTS: Product[] = [
-  { id: uid(), name: "Bier", price: 4.5, category: "Getränke" },
-  { id: uid(), name: "Cola", price: 3.5, category: "Getränke" },
-  { id: uid(), name: "Wasser", price: 3.0, category: "Getränke" },
-  { id: uid(), name: "Schnitzel", price: 14.9, category: "Speisen" },
-];
+type ApiCategory = { category_id: number; category_name: string };
+type ApiProduct = { product_id: number; price: number; name: string; category: number };
 
 // ─── Product Form (inline) ────────────────────────────────────────────────────
 
@@ -218,13 +207,57 @@ function ProductRow({ product, categories, onUpdate, onRequestDelete }: ProductR
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Settingspage() {
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryMap, setCategoryMap] = useState<Map<string, number>>(new Map());
   const [activeCategory, setActiveCategory] = useState<string>("Alle");
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState("");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialog>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    async function fetchInitialData() {
+      try {
+        const catRes = await fetch("/get/all-categories/");
+        const prodRes = await fetch("/get/all-products/");
+        if (!catRes.ok || !prodRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
+
+        const catData: ApiCategory[] = await catRes.json();
+        const prodData: ApiProduct[] = await prodRes.json();
+
+        const cMap = new Map<string, number>();
+        const rMap = new Map<number, string>();
+        const cats: string[] = [];
+
+        catData.forEach(c => {
+          cMap.set(c.category_name, c.category_id);
+          rMap.set(c.category_id, c.category_name);
+          cats.push(c.category_name);
+        });
+
+        setCategoryMap(cMap);
+        setCategories(cats);
+
+        const MAPPED_PRODUCTS: Product[] = prodData.map(p => ({
+          id: p.product_id.toString(),
+          name: p.name,
+          category: rMap.get(p.category) || "Unbekannt",
+          price: p.price,
+        }));
+        setProducts(MAPPED_PRODUCTS);
+      } catch (err) {
+        console.error(err);
+        setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchInitialData();
+  }, []);
 
   const allCategories = ["Alle", ...categories];
   const filteredProducts =
@@ -234,13 +267,32 @@ export default function Settingspage() {
 
   // ─── Product actions ───────────────────────────────────────────────────────
 
-  function addProduct(p: Omit<Product, "id">) {
-    setProducts((prev) => [...prev, { ...p, id: uid() }]);
-    setShowAddProduct(false);
+  async function addProduct(p: Omit<Product, "id">) {
+    try {
+      const catId = categoryMap.get(p.category) || 0;
+      const res = await fetch("/add/product/", {
+        method: "POST",
+        body: JSON.stringify({ price: p.price, name: p.name, category: catId })
+      });
+      if (!res.ok) throw new Error("Konnte Produkt nicht speichern");
+      window.location.reload();
+    } catch (err) {
+      setError("Fehler beim Speichern des Produkts");
+    }
   }
 
-  function updateProduct(updated: Product) {
-    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  async function updateProduct(updated: Product) {
+    try {
+      const catId = categoryMap.get(updated.category) || 0;
+      const res = await fetch("/update/product/", {
+        method: "POST",
+        body: JSON.stringify({ product_id: parseInt(updated.id), price: updated.price, name: updated.name, category: catId })
+      });
+      if (!res.ok) throw new Error("Konnte Produkt nicht updaten");
+      setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    } catch (err) {
+      setError("Fehler beim Updaten des Produkts");
+    }
   }
 
   function requestDeleteProduct(id: string, name: string) {
@@ -249,12 +301,19 @@ export default function Settingspage() {
 
   // ─── Category actions ──────────────────────────────────────────────────────
 
-  function addCategory() {
+  async function addCategory() {
     const trimmed = newCategoryInput.trim();
     if (!trimmed || categories.includes(trimmed)) return;
-    setCategories((prev) => [...prev, trimmed]);
-    setNewCategoryInput("");
-    setShowAddCategory(false);
+    try {
+      const res = await fetch("/add/category/", {
+        method: "POST",
+        body: JSON.stringify({ category_name: trimmed })
+      });
+      if (!res.ok) throw new Error("Konnte Kategorie nicht speichern");
+      window.location.reload();
+    } catch (err) {
+      setError("Fehler beim Speichern der Kategorie");
+    }
   }
 
   function requestDeleteCategory(name: string) {
@@ -263,14 +322,32 @@ export default function Settingspage() {
 
   // ─── Confirm / cancel dialog ───────────────────────────────────────────────
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteDialog) return;
-    if (deleteDialog.type === "product") {
-      setProducts((prev) => prev.filter((p) => p.id !== deleteDialog.id));
-    }
-    if (deleteDialog.type === "category") {
-      setCategories((prev) => prev.filter((c) => c !== deleteDialog.name));
-      if (activeCategory === deleteDialog.name) setActiveCategory("Alle");
+    setError(null);
+    try {
+      if (deleteDialog.type === "product") {
+        const res = await fetch("/delete/product/", {
+          method: "POST",
+          body: JSON.stringify({ product_id: parseInt(deleteDialog.id) })
+        });
+        if (!res.ok) throw new Error("Netzwerkfehler");
+        setProducts((prev) => prev.filter((p) => p.id !== deleteDialog.id));
+      }
+      if (deleteDialog.type === "category") {
+        const cId = categoryMap.get(deleteDialog.name);
+        if (cId !== undefined) {
+          const res = await fetch("/delete/category/", {
+            method: "POST",
+            body: JSON.stringify({ category_id: cId })
+          });
+          if (!res.ok) throw new Error("Netzwerkfehler");
+        }
+        setCategories((prev) => prev.filter((c) => c !== deleteDialog.name));
+        if (activeCategory === deleteDialog.name) setActiveCategory("Alle");
+      }
+    } catch (err) {
+      setError("Löschen fehlgeschlagen");
     }
     setDeleteDialog(null);
   }
@@ -289,172 +366,187 @@ export default function Settingspage() {
           <h1 className="font-bold text-lg tracking-tight">Einstellungen</h1>
         </div>
 
-        <div className="max-w-lg mx-auto px-4 pt-6 flex flex-col gap-6">
+        {error && (
+          <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center z-50 sticky top-[57px]">
+            {error}
+          </div>
+        )}
 
-          {/* ── Produkte ─────────────────────────────────────────────────────── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                  <UtensilsCrossed className="w-4 h-4" />
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center min-h-[40vh] text-center">
+            <div className="text-muted-foreground font-semibold">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4 mx-auto"></div>
+              Wird geladen...
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-lg mx-auto px-4 pt-6 flex flex-col gap-6">
+
+            {/* ── Produkte ─────────────────────────────────────────────────────── */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <UtensilsCrossed className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Produkte</CardTitle>
+                    <CardDescription>{products.length} Artikel angelegt</CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className="text-base">Produkte</CardTitle>
-                  <CardDescription>{products.length} Artikel angelegt</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
 
-              <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-                <TabsList className="flex flex-wrap h-auto gap-1 w-full">
-                  {allCategories.map((cat) => (
-                    <TabsTrigger key={cat} value={cat}>
-                      {cat}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+                <Tabs value={activeCategory} onValueChange={setActiveCategory}>
+                  <TabsList className="flex flex-wrap h-auto gap-1 w-full">
+                    {allCategories.map((cat) => (
+                      <TabsTrigger key={cat} value={cat}>
+                        {cat}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
 
-                {allCategories.map((cat) => {
-                  const tabProducts =
-                    cat === "Alle"
-                      ? products
-                      : products.filter((p) => p.category === cat);
-                  return (
-                    <TabsContent key={cat} value={cat} className="mt-4">
-                      {tabProducts.length > 0 ? (
-                        tabProducts.map((p) => (
-                          <ProductRow
-                            key={p.id}
-                            product={p}
-                            categories={categories}
-                            onUpdate={updateProduct}
-                            onRequestDelete={requestDeleteProduct}
-                          />
-                        ))
-                      ) : (
-                        <p className="py-8 text-center text-muted-foreground text-sm opacity-50">
-                          Keine Produkte in dieser Kategorie
-                        </p>
-                      )}
-                    </TabsContent>
-                  );
-                })}
-              </Tabs>
+                  {allCategories.map((cat) => {
+                    const tabProducts =
+                      cat === "Alle"
+                        ? products
+                        : products.filter((p) => p.category === cat);
+                    return (
+                      <TabsContent key={cat} value={cat} className="mt-4">
+                        {tabProducts.length > 0 ? (
+                          tabProducts.map((p) => (
+                            <ProductRow
+                              key={p.id}
+                              product={p}
+                              categories={categories}
+                              onUpdate={updateProduct}
+                              onRequestDelete={requestDeleteProduct}
+                            />
+                          ))
+                        ) : (
+                          <p className="py-8 text-center text-muted-foreground text-sm opacity-50">
+                            Keine Produkte in dieser Kategorie
+                          </p>
+                        )}
+                      </TabsContent>
+                    );
+                  })}
+                </Tabs>
 
-              {/* Produkt hinzufügen */}
-              {showAddProduct ? (
-                <ProductForm
-                  categories={categories}
-                  onSave={addProduct}
-                  onCancel={() => setShowAddProduct(false)}
-                />
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-full border-dashed"
-                  onClick={() => setShowAddProduct(true)}
-                >
-                  <PlusCircle className="w-4 h-4 mr-2" />
-                  Produkt hinzufügen
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* ── Kategorien ───────────────────────────────────────────────────── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                  <Layers className="w-4 h-4" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">Kategorien</CardTitle>
-                  <CardDescription>Produktgruppen verwalten</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-
-              <div>
-                {categories.map((cat) => {
-                  const productCount = products.filter((p) => p.category === cat).length;
-                  const canDelete = productCount === 0;
-
-                  return (
-                    <div
-                      key={cat}
-                      className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0"
-                    >
-                      <span className="text-sm font-medium">{cat}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {productCount} Artikel
-                        </Badge>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="w-7 h-7 hover:bg-destructive/10 hover:text-destructive"
-                                disabled={!canDelete}
-                                onClick={() => canDelete && requestDeleteCategory(cat)}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          {!canDelete && (
-                            <TooltipContent side="left">
-                              <p>Erst alle Produkte aus dieser Kategorie entfernen.</p>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Kategorie hinzufügen */}
-              {showAddCategory ? (
-                <div className="flex gap-2">
-                  <Input
-                    autoFocus
-                    value={newCategoryInput}
-                    onChange={(e) => setNewCategoryInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addCategory()}
-                    placeholder="Kategoriename"
-                    className="flex-1"
+                {/* Produkt hinzufügen */}
+                {showAddProduct ? (
+                  <ProductForm
+                    categories={categories}
+                    onSave={addProduct}
+                    onCancel={() => setShowAddProduct(false)}
                   />
+                ) : (
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hover:bg-destructive/10 hover:text-destructive shrink-0"
-                    onClick={() => { setShowAddCategory(false); setNewCategoryInput(""); }}
+                    variant="outline"
+                    className="w-full border-dashed"
+                    onClick={() => setShowAddProduct(true)}
                   >
-                    <X className="w-4 h-4" />
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Produkt hinzufügen
                   </Button>
-                  <Button size="icon" className="shrink-0" onClick={addCategory}>
-                    <Check className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-full border-dashed"
-                  onClick={() => setShowAddCategory(true)}
-                >
-                  <PlusCircle className="w-4 h-4 mr-2" />
-                  Kategorie hinzufügen
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
 
-        </div>
+            {/* ── Kategorien ───────────────────────────────────────────────────── */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Kategorien</CardTitle>
+                    <CardDescription>Produktgruppen verwalten</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+
+                <div>
+                  {categories.map((cat) => {
+                    const productCount = products.filter((p) => p.category === cat).length;
+                    const canDelete = productCount === 0;
+
+                    return (
+                      <div
+                        key={cat}
+                        className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0"
+                      >
+                        <span className="text-sm font-medium">{cat}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {productCount} Artikel
+                          </Badge>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="w-7 h-7 hover:bg-destructive/10 hover:text-destructive"
+                                  disabled={!canDelete}
+                                  onClick={() => canDelete && requestDeleteCategory(cat)}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {!canDelete && (
+                              <TooltipContent side="left">
+                                <p>Erst alle Produkte aus dieser Kategorie entfernen.</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Kategorie hinzufügen */}
+                {showAddCategory ? (
+                  <div className="flex gap-2">
+                    <Input
+                      autoFocus
+                      value={newCategoryInput}
+                      onChange={(e) => setNewCategoryInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addCategory()}
+                      placeholder="Kategoriename"
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-destructive/10 hover:text-destructive shrink-0"
+                      onClick={() => { setShowAddCategory(false); setNewCategoryInput(""); }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" className="shrink-0" onClick={addCategory}>
+                      <Check className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full border-dashed"
+                    onClick={() => setShowAddCategory(true)}
+                  >
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Kategorie hinzufügen
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+          </div>
+        )}
 
 
         {/* ── Delete Confirmation Dialog ──────────────────────────────────────── */}

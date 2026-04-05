@@ -83,12 +83,76 @@ func addProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func updateProductHandler(w http.ResponseWriter, r *http.Request) {
+	var p Product
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := updateProduct(p, DB); err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func deleteProductHandler(w http.ResponseWriter, r *http.Request) {
+	var p Product
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := deleteProduct(p.Product_Id, DB); err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func addCategoryHandler(w http.ResponseWriter, r *http.Request) {
+	var c Category
+	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := insertCategory(c, DB); err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func deleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
+	var c Category
+	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := deleteCategory(c.Category_Id, DB); err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
 	router.HandleFunc("/get/all-categories/", getCategories)
 	router.HandleFunc("/add/product/", addProduct)
+	router.HandleFunc("/update/product/", updateProductHandler)
+	router.HandleFunc("/delete/product/", deleteProductHandler)
+	router.HandleFunc("/add/category/", addCategoryHandler)
+	router.HandleFunc("/delete/category/", deleteCategoryHandler)
+
+	// Serve frontend static files
+	fs := http.FileServer(http.Dir("./public"))
+	router.Handle("/", fs)
 	server := http.Server{Addr: ":8000", Handler: router}
 	log.Println("Listening for requests...")
 	go server.ListenAndServe()

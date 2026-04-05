@@ -22,9 +22,13 @@ func OpenDatabaseHandle() {
 	}
 	host, ok := os.LookupEnv("BESTELLSERVICE_HOST")
 	if !ok {
-		log.Fatalf("error looking up database password")
+		log.Fatalf("error looking up database host")
 	}
-	dsn := fmt.Sprintf("root:%v@tcp(%v:3306)/bestellservice", password, host)
+	port, ok := os.LookupEnv("BESTELLSERVICE_PORT")
+	if !ok {
+		port = "3306"
+	}
+	dsn := fmt.Sprintf("root:%v@tcp(%v:%v)/bestellservice?charset=utf8mb4", password, host, port)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("error creating handle to database: %v", err)
@@ -59,6 +63,18 @@ func insertProduct(p Product, db *sql.DB) error {
 	return nil
 }
 
+func updateProduct(p Product, db *sql.DB) error {
+	query := fmt.Sprintf("update test_produkte set price=%v, name=\"%v\", product_category=%v where id=%v;", p.Price, p.Name, p.Category, p.Product_Id)
+	_, err := db.Exec(query)
+	return err
+}
+
+func deleteProduct(id int, db *sql.DB) error {
+	query := fmt.Sprintf("delete from test_produkte where id=%v;", id)
+	_, err := db.Exec(query)
+	return err
+}
+
 func getAllCategories(db *sql.DB) ([]Category, error) {
 	var cats []Category
 	rows, err := db.Query("SELECT * FROM produkt_kategorien;")
@@ -75,4 +91,16 @@ func getAllCategories(db *sql.DB) ([]Category, error) {
 		cats = append(cats, c)
 	}
 	return cats, nil
+}
+
+func insertCategory(c Category, db *sql.DB) error {
+	query := fmt.Sprintf("insert into produkt_kategorien (name) values (\"%v\");", c.Name)
+	_, err := db.Exec(query)
+	return err
+}
+
+func deleteCategory(id int, db *sql.DB) error {
+	query := fmt.Sprintf("delete from produkt_kategorien where id=%v;", id)
+	_, err := db.Exec(query)
+	return err
 }
