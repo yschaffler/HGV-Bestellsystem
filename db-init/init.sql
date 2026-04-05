@@ -1,3 +1,4 @@
+SET NAMES utf8mb4;
 CREATE DATABASE IF NOT EXISTS `bestellservice` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `bestellservice`;
 
@@ -28,8 +29,8 @@ INSERT INTO `test_produkte` (`name`, `price`, `product_category`) VALUES
 ('Spezi', 3.50, 1),
 ('Wasser Medium', 3.00, 1),
 ('Weinschorle', 5.00, 1),
-('Mojito', 8.50, 2),
-('Caipirinha', 8.50, 2),
-('Gin Tonic', 7.50, 2),
-('Brezel', 2.50, 3),
-('Chips', 2.00, 3);
+('Schnitzel', 13.50, 2),
+('Pommes', 5.50, 2),
+('Kaiserschmarn', 12.50, 2),
+('Ketchup', 0.50, 3),
+('Mayonnaise', 0.50, 3);
