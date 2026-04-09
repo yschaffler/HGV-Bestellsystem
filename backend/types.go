@@ -15,8 +15,9 @@ type Category struct {
 
 type Order struct {
 	Id      int     `json:"order_id"`
-	Product int `json:"order_product"`
+	Product int     `json:"order_product"`
 	Amount  int     `json:"order_amount"`
 	Price   float64 `json:"order_price"`
 	Payed   bool    `json:"order_payed"`
+	Table   int     `json:"order_table"`
 }

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `bestellungen` (
     `amount` INT NOT NULL,
     `price` FLOAT NOT NULL,
     `payed` BOOLEAN NOT NULL,
+    `table` INT NOT NULL,
     FOREIGN KEY (`product`) REFERENCES `test_produkte` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -166,6 +167,44 @@ func getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+func getOpenOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
+	idString := r.FormValue("id")
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		log.Printf("error parsing id from parameters: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	orders, err := getOpenOrdersForTable(id, DB)
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marshaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func getAllOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
+	idString := r.FormValue("id")
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		log.Printf("error parsing id from parameters: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	orders, err := getOpenOrdersForTable(id, DB)
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marshaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
 func updateOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	var o Order
 	if err := json.NewDecoder(r.Body); err != nil {
@@ -211,6 +250,8 @@ func main() {
 	router.HandleFunc("/update/order/", updateOrdersHandler)
 	router.HandleFunc("/delete/order/", deleteOrdersHandler)
 	router.HandleFunc("/add/order/", createOrderHandler)
+	router.HandleFunc("/get/order/table/{id}", getOpenOrdersForTableHandler)
+	router.HandleFunc("/get/all-orders/table/{id}", getAllOrdersForTableHandler)
 
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))
