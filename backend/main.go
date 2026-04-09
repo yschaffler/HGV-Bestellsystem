@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -45,28 +46,6 @@ func getCategories(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 func addProduct(w http.ResponseWriter, r *http.Request) {
-	/*r.ParseForm()
-	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
-	if err != nil {
-		log.Printf("error parsing price: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	name := r.FormValue("name")
-	category, err := strconv.Atoi(r.FormValue("category"))
-	if err != nil {
-		log.Printf("error parsing price: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	product := Product{Price: price, Name: name, Category: category}
-	err = insertProduct(product, DB)
-	if err != nil {
-		log.Printf("error inserting into database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)*/
 	var p Product
 	err := json.NewDecoder(r.Body).Decode(&p)
 	if err != nil {
@@ -139,6 +118,123 @@ func deleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func createOrderHandler(w http.ResponseWriter, r *http.Request) {
+	var o Order
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+		log.Printf("error parsing new order from request body: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := insertOrder(o, DB); err != nil {
+		log.Printf("error isnerting order into database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func getUnpaidOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	orders, err := getUnpaidOrders(DB)
+	if err != nil {
+		log.Printf("errorretrieving unoaid order form the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marhsaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	orders, err := getAllOrders(DB)
+	if err != nil {
+		log.Printf("errorretrieving unoaid order form the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marhsaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func getOpenOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
+	idString := r.FormValue("id")
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		log.Printf("error parsing id from parameters: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	orders, err := getOpenOrdersForTable(id, DB)
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marshaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func getAllOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
+	idString := r.FormValue("id")
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		log.Printf("error parsing id from parameters: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	orders, err := getOpenOrdersForTable(id, DB)
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marshaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func updateOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	var o Order
+	if err := json.NewDecoder(r.Body); err != nil {
+		log.Printf("error decoding order from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := updateOrder(o, DB); err != nil {
+		log.Printf("error updating order: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func deleteOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	var o Order
+	if err := json.NewDecoder(r.Body); err != nil {
+		log.Printf("error decodign order from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := deleteOrder(o, DB); err != nil {
+		log.Printf("error deleting order: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
@@ -149,6 +245,13 @@ func main() {
 	router.HandleFunc("/delete/product/", deleteProductHandler)
 	router.HandleFunc("/add/category/", addCategoryHandler)
 	router.HandleFunc("/delete/category/", deleteCategoryHandler)
+	router.HandleFunc("/get/all-orders/", getAllOrdersHandler)
+	router.HandleFunc("/get/unpaid-orders/", getUnpaidOrdersHandler)
+	router.HandleFunc("/update/order/", updateOrdersHandler)
+	router.HandleFunc("/delete/order/", deleteOrdersHandler)
+	router.HandleFunc("/add/order/", createOrderHandler)
+	router.HandleFunc("/get/order/table/{id}", getOpenOrdersForTableHandler)
+	router.HandleFunc("/get/all-orders/table/{id}", getAllOrdersForTableHandler)
 
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))

@@ -4,7 +4,8 @@ USE `bestellservice`;
 
 CREATE TABLE IF NOT EXISTS `produkt_kategorien` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `name` VARCHAR(255) NOT NULL
+    `name` VARCHAR(255) NOT NULL,
+    `color` VARCHAR(255)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `test_produkte` (
@@ -13,6 +14,16 @@ CREATE TABLE IF NOT EXISTS `test_produkte` (
     `name` VARCHAR(255) NOT NULL,
     `product_category` INT NOT NULL,
     FOREIGN KEY (`product_category`) REFERENCES `produkt_kategorien`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `bestellungen` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `product` INT NOT NULL,
+    `amount` INT NOT NULL,
+    `price` FLOAT NOT NULL,
+    `payed` BOOLEAN NOT NULL,
+    `table` INT NOT NULL,
+    FOREIGN KEY (`product`) REFERENCES `test_produkte` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Initiale Kategorien anlegen
