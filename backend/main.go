@@ -117,6 +117,85 @@ func deleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func createOrderHandler(w http.ResponseWriter, r *http.Request) {
+	var o Order
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+		log.Printf("error parsing new order from request body: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := insertOrder(o, DB); err != nil {
+		log.Printf("error isnerting order into database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func getUnpaidOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	orders, err := getUnpaidOrders(DB)
+	if err != nil {
+		log.Printf("errorretrieving unoaid order form the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marhsaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	orders, err := getAllOrders(DB)
+	if err != nil {
+		log.Printf("errorretrieving unoaid order form the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(orders)
+	if err != nil {
+		log.Printf("error marhsaling orders to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func updateOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	var o Order
+	if err := json.NewDecoder(r.Body); err != nil {
+		log.Printf("error decoding order from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := updateOrder(o, DB); err != nil {
+		log.Printf("error updating order: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func deleteOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	var o Order
+	if err := json.NewDecoder(r.Body); err != nil {
+		log.Printf("error decodign order from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := deleteOrder(o, DB); err != nil {
+		log.Printf("error deleting order: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
@@ -127,6 +206,11 @@ func main() {
 	router.HandleFunc("/delete/product/", deleteProductHandler)
 	router.HandleFunc("/add/category/", addCategoryHandler)
 	router.HandleFunc("/delete/category/", deleteCategoryHandler)
+	router.HandleFunc("/get/all-orders/", getAllOrdersHandler)
+	router.HandleFunc("/get/unpaid-orders/", getUnpaidOrdersHandler)
+	router.HandleFunc("/update/order/", updateOrdersHandler)
+	router.HandleFunc("/delete/order/", deleteOrdersHandler)
+	router.HandleFunc("/add/order/", createOrderHandler)
 
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))

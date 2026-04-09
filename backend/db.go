@@ -104,3 +104,57 @@ func deleteCategory(id int, db *sql.DB) error {
 	_, err := db.Exec(query)
 	return err
 }
+
+func insertOrder(o Order, db *sql.DB) error {
+	query := fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed) VALUES (%v, %v, %v, %v);", o.Product, o.Amount, o.Price, o.Payed)
+	_, err := db.Exec(query)
+	return err
+}
+
+func getUnpaidOrders(db *sql.DB) ([]Order, error) {
+	var orders []Order
+	rows, err := db.Query("SELECT * FROM bestellungen WHERE payed=false;")
+	if err != nil {
+		return []Order{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var o Order
+		err = rows.Scan(&o.Id, &o.Product, &o.Amount, &o.Price, &o.Payed)
+		if err != nil {
+			return []Order{}, err
+		}
+		orders = append(orders, o)
+	}
+	return orders, err
+}
+
+func getAllOrders(db *sql.DB) ([]Order, error) {
+	var orders []Order
+	rows, err := db.Query("SELECT * FROM bestellungen;")
+	if err != nil {
+		return []Order{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var o Order
+		err = rows.Scan(&o.Id, &o.Product, &o.Amount, &o.Price, &o.Payed)
+		if err != nil {
+			return []Order{}, err
+		}
+		orders = append(orders, o)
+	}
+	return orders, err
+}
+
+func updateOrder(o Order, db *sql.DB) error {
+	query := fmt.Sprintf("UPDATE bestellungen SET product=%v, amount=%v, price=%v, payed=%v WHERE id=%v;", o.Product, o.Amount, o.Price, o.Payed, o.Id)
+	_, err := db.Exec(query)
+	return err
+}
+
+func deleteOrder(o Order, db *sql.DB) error {
+	query := fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v", o.Id)
+	_, err := db.Exec(query)
+	return err
+}
