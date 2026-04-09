@@ -10,4 +10,13 @@ type Product struct {
 type Category struct {
 	Category_Id int    `json:"category_id"`
 	Name        string `json:"category_name"`
+	Color       string `json:"category_color"`
+}
+
+type Order struct {
+	Id      int     `json:"order_id"`
+	Product Product `json:"order_product"`
+	Amount  int     `json:"order_amount"`
+	Price   float64 `json:"order_price"`
+	Payed   bool    `json:"order_payed"`
 }

@@ -45,28 +45,6 @@ func getCategories(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 func addProduct(w http.ResponseWriter, r *http.Request) {
-	/*r.ParseForm()
-	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
-	if err != nil {
-		log.Printf("error parsing price: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	name := r.FormValue("name")
-	category, err := strconv.Atoi(r.FormValue("category"))
-	if err != nil {
-		log.Printf("error parsing price: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	product := Product{Price: price, Name: name, Category: category}
-	err = insertProduct(product, DB)
-	if err != nil {
-		log.Printf("error inserting into database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)*/
 	var p Product
 	err := json.NewDecoder(r.Body).Decode(&p)
 	if err != nil {

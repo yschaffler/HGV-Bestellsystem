@@ -84,7 +84,7 @@ func getAllCategories(db *sql.DB) ([]Category, error) {
 	defer rows.Close()
 	for rows.Next() {
 		c := Category{}
-		err := rows.Scan(&c.Category_Id, &c.Name)
+		err := rows.Scan(&c.Category_Id, &c.Name, &c.Color)
 		if err != nil {
 			return []Category{}, fmt.Errorf("failed to scan database response: %v", err)
 		}
