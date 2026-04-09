@@ -21,3 +21,13 @@ type Order struct {
 	Payed   bool    `json:"order_payed"`
 	Table   int     `json:"order_table"`
 }
+
+type PayItem struct {
+	Product int `json:"product"`
+	Amount  int `json:"amount"`
+}
+
+type PayRequest struct {
+	Table int       `json:"table"`
+	Items []PayItem `json:"items"`
+}

@@ -94,7 +94,13 @@ func getAllCategories(db *sql.DB) ([]Category, error) {
 }
 
 func insertCategory(c Category, db *sql.DB) error {
-	query := fmt.Sprintf("insert into produkt_kategorien (name) values (\"%v\");", c.Name)
+	query := fmt.Sprintf("insert into produkt_kategorien (name, color) values (\"%v\", \"%v\");", c.Name, c.Color)
+	_, err := db.Exec(query)
+	return err
+}
+
+func updateCategory(c Category, db *sql.DB) error {
+	query := fmt.Sprintf("update produkt_kategorien set name=\"%v\", color=\"%v\" where id=%v;", c.Name, c.Color, c.Category_Id)
 	_, err := db.Exec(query)
 	return err
 }
@@ -106,7 +112,7 @@ func deleteCategory(id int, db *sql.DB) error {
 }
 
 func insertOrder(o Order, db *sql.DB) error {
-	query := fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, table) VALUES (%v, %v, %v, %v, %v);", o.Product, o.Amount, o.Price, o.Payed, o.Table)
+	query := fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, `table`) VALUES (%v, %v, %v, %v, %v);", o.Product, o.Amount, o.Price, o.Payed, o.Table)
 	_, err := db.Exec(query)
 	return err
 }
@@ -131,7 +137,7 @@ func getUnpaidOrders(db *sql.DB) ([]Order, error) {
 
 func getOpenOrdersForTable(table int, db *sql.DB) ([]Order, error) {
 	var orders []Order
-	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE table=%v AND payed=false;", table)
+	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE `table`=%v AND payed=false;", table)
 	rows, err := db.Query(query)
 	if err != nil {
 		return []Order{}, err
@@ -150,7 +156,7 @@ func getOpenOrdersForTable(table int, db *sql.DB) ([]Order, error) {
 
 func getAllOrdersForTable(table int, db *sql.DB) ([]Order, error) {
 	var orders []Order
-	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE table=%v;", table)
+	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE `table`=%v;", table)
 	rows, err := db.Query(query)
 	if err != nil {
 		return []Order{}, err
@@ -186,7 +192,7 @@ func getAllOrders(db *sql.DB) ([]Order, error) {
 }
 
 func updateOrder(o Order, db *sql.DB) error {
-	query := fmt.Sprintf("UPDATE bestellungen SET product=%v, amount=%v, price=%v, payed=%v, table=%v WHERE id=%v;", o.Product, o.Amount, o.Price, o.Payed, o.Table, o.Id)
+	query := fmt.Sprintf("UPDATE bestellungen SET product=%v, amount=%v, price=%v, payed=%v, `table`=%v WHERE id=%v;", o.Product, o.Amount, o.Price, o.Payed, o.Table, o.Id)
 	_, err := db.Exec(query)
 	return err
 }
@@ -195,4 +201,91 @@ func deleteOrder(o Order, db *sql.DB) error {
 	query := fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v", o.Id)
 	_, err := db.Exec(query)
 	return err
+}
+
+func payTableItems(table int, items []PayItem, db *sql.DB) error {
+	for _, item := range items {
+		amountToPay := item.Amount
+		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC", table, item.Product)
+		rows, err := db.Query(query)
+		if err != nil {
+			return err
+		}
+		
+		type orderRow struct {
+			id     int
+			amount int
+			price  float64
+		}
+		var openOrders []orderRow
+		for rows.Next() {
+			var o orderRow
+			if err := rows.Scan(&o.id, &o.amount, &o.price); err == nil {
+				openOrders = append(openOrders, o)
+			}
+		}
+		rows.Close()
+
+		for _, row := range openOrders {
+			if amountToPay <= 0 {
+				break
+			}
+			deduct := amountToPay
+			if deduct > row.amount {
+				deduct = row.amount
+			}
+
+			if deduct == row.amount {
+				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET payed=true WHERE id=%v", row.id))
+			} else {
+				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v", deduct, row.id))
+				_, _ = db.Exec(fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, `table`) VALUES (%v, %v, %v, true, %v)", item.Product, deduct, row.price, table))
+			}
+			amountToPay -= deduct
+		}
+	}
+	return nil
+}
+
+func returnTableItems(table int, items []PayItem, db *sql.DB) error {
+	for _, item := range items {
+		amountToReturn := item.Amount
+		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC", table, item.Product)
+		rows, err := db.Query(query)
+		if err != nil {
+			return err
+		}
+		
+		type orderRow struct {
+			id     int
+			amount int
+			price  float64
+		}
+		var openOrders []orderRow
+		for rows.Next() {
+			var o orderRow
+			if err := rows.Scan(&o.id, &o.amount, &o.price); err == nil {
+				openOrders = append(openOrders, o)
+			}
+		}
+		rows.Close()
+
+		for _, row := range openOrders {
+			if amountToReturn <= 0 {
+				break
+			}
+			deduct := amountToReturn
+			if deduct > row.amount {
+				deduct = row.amount
+			}
+
+			if deduct == row.amount {
+				_, _ = db.Exec(fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v", row.id))
+			} else {
+				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v", deduct, row.id))
+			}
+			amountToReturn -= deduct
+		}
+	}
+	return nil
 }

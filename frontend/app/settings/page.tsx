@@ -77,7 +77,7 @@ type DeleteDialog =
   | null;
 
 
-type ApiCategory = { category_id: number; category_name: string };
+type ApiCategory = { category_id: number; category_name: string; category_color: string };
 type ApiProduct = { product_id: number; price: number; name: string; category: number };
 
 // ─── Product Form (inline) ────────────────────────────────────────────────────
@@ -219,11 +219,10 @@ function CategoryForm({ initial, onSave, onCancel }: CategoryFormProps) {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className={`w-8 h-8 rounded-full border-2 flex flex-shrink-0 items-center justify-center cursor-pointer transition-all ${
-                  !PRESET_COLORS.includes(color)
-                    ? "border-primary scale-110 shadow-sm"
-                    : "border-dashed border-muted-foreground/50 hover:bg-muted/50 hover:scale-105 bg-background"
-                }`}
+                className={`w-8 h-8 rounded-full border-2 flex flex-shrink-0 items-center justify-center cursor-pointer transition-all ${!PRESET_COLORS.includes(color)
+                  ? "border-primary scale-110 shadow-sm"
+                  : "border-dashed border-muted-foreground/50 hover:bg-muted/50 hover:scale-105 bg-background"
+                  }`}
                 style={!PRESET_COLORS.includes(color) ? { backgroundColor: color } : {}}
                 title="Eigene Farbe"
               >
@@ -324,11 +323,82 @@ function ProductRow({ product, categories, onUpdate, onRequestDelete }: ProductR
   );
 }
 
+// ─── Category Row ─────────────────────────────────────────────────────────────
+
+type CategoryRowProps = {
+  category: Category;
+  productCount: number;
+  onUpdate: (c: Category) => void;
+  onRequestDelete: (name: string) => void;
+};
+
+function CategoryRow({ category, productCount, onUpdate, onRequestDelete }: CategoryRowProps) {
+  const [editing, setEditing] = useState(false);
+  const canDelete = productCount === 0;
+
+  if (editing) {
+    return (
+      <CategoryForm
+        initial={category}
+        onSave={(updated) => {
+          onUpdate({ ...updated, id: category.id });
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0 group">
+      <div className="flex items-center gap-3">
+        <div className="w-3.5 h-3.5 rounded-full border border-border shrink-0" style={{ backgroundColor: category.color || "#e2e8f0" }} />
+        <span className="text-sm font-medium">{category.name}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary" className="text-xs">
+          {productCount} Artikel
+        </Badge>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-7 h-7 hover:bg-primary/10 hover:text-primary"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-7 h-7 hover:bg-destructive/10 hover:text-destructive"
+                  disabled={!canDelete}
+                  onClick={() => canDelete && onRequestDelete(category.name)}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!canDelete && (
+              <TooltipContent side="left">
+                <p>Erst alle Produkte aus dieser Kategorie entfernen.</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Settingspage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [categoryMap, setCategoryMap] = useState<Map<string, number>>(new Map());
   const [activeCategory, setActiveCategory] = useState<string>("Alle");
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -350,12 +420,12 @@ export default function Settingspage() {
 
         const cMap = new Map<string, number>();
         const rMap = new Map<number, string>();
-        const cats: string[] = [];
+        const cats: Category[] = [];
 
         catData.forEach(c => {
           cMap.set(c.category_name, c.category_id);
           rMap.set(c.category_id, c.category_name);
-          cats.push(c.category_name);
+          cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
         });
 
         setCategoryMap(cMap);
@@ -378,7 +448,7 @@ export default function Settingspage() {
     fetchInitialData();
   }, []);
 
-  const allCategories = ["Alle", ...categories];
+  const allCategoryNames = ["Alle", ...categories.map(c => c.name)];
   const filteredProducts =
     activeCategory === "Alle"
       ? products
@@ -422,16 +492,31 @@ export default function Settingspage() {
 
   async function addCategory(newCat: Omit<Category, "id">) {
     const trimmed = newCat.name.trim();
-    if (!trimmed || categories.includes(trimmed)) return;
+    if (!trimmed || categories.some(c => c.name === trimmed)) return;
     try {
       const res = await fetch("/add/category/", {
         method: "POST",
-        body: JSON.stringify({ category_name: trimmed, color: newCat.color })
+        body: JSON.stringify({ category_name: trimmed, category_color: newCat.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht speichern");
       window.location.reload();
     } catch (err) {
       setError("Fehler beim Speichern der Kategorie");
+    }
+  }
+
+  async function updateCategory(updated: Category) {
+    const trimmed = updated.name.trim();
+    if (!trimmed) return;
+    try {
+      const res = await fetch("/update/category/", {
+        method: "POST",
+        body: JSON.stringify({ category_id: parseInt(updated.id), category_name: trimmed, category_color: updated.color })
+      });
+      if (!res.ok) throw new Error("Konnte Kategorie nicht updaten");
+      window.location.reload();
+    } catch (err) {
+      setError("Fehler beim Updaten der Kategorie");
     }
   }
 
@@ -462,7 +547,7 @@ export default function Settingspage() {
           });
           if (!res.ok) throw new Error("Netzwerkfehler");
         }
-        setCategories((prev) => prev.filter((c) => c !== deleteDialog.name));
+        setCategories((prev) => prev.filter((c) => c.name !== deleteDialog.name));
         if (activeCategory === deleteDialog.name) setActiveCategory("Alle");
       }
     } catch (err) {
@@ -518,26 +603,26 @@ export default function Settingspage() {
 
                 <Tabs value={activeCategory} onValueChange={setActiveCategory}>
                   <TabsList className="flex flex-wrap h-auto gap-1 w-full">
-                    {allCategories.map((cat) => (
-                      <TabsTrigger key={cat} value={cat}>
-                        {cat}
+                    {allCategoryNames.map((catName) => (
+                      <TabsTrigger key={catName} value={catName}>
+                        {catName}
                       </TabsTrigger>
                     ))}
                   </TabsList>
 
-                  {allCategories.map((cat) => {
+                  {allCategoryNames.map((catName) => {
                     const tabProducts =
-                      cat === "Alle"
+                      catName === "Alle"
                         ? products
-                        : products.filter((p) => p.category === cat);
+                        : products.filter((p) => p.category === catName);
                     return (
-                      <TabsContent key={cat} value={cat} className="mt-4">
+                      <TabsContent key={catName} value={catName} className="mt-4">
                         {tabProducts.length > 0 ? (
                           tabProducts.map((p) => (
                             <ProductRow
                               key={p.id}
                               product={p}
-                              categories={categories}
+                              categories={categories.map(c => c.name)}
                               onUpdate={updateProduct}
                               onRequestDelete={requestDeleteProduct}
                             />
@@ -555,7 +640,7 @@ export default function Settingspage() {
                 {/* Produkt hinzufügen */}
                 {showAddProduct ? (
                   <ProductForm
-                    categories={categories}
+                    categories={categories.map(c => c.name)}
                     onSave={addProduct}
                     onCancel={() => setShowAddProduct(false)}
                   />
@@ -588,42 +673,16 @@ export default function Settingspage() {
               <CardContent className="flex flex-col gap-4">
 
                 <div>
-                  {categories.map((cat) => {
-                    const productCount = products.filter((p) => p.category === cat).length;
-                    const canDelete = productCount === 0;
-
+                  {categories.map((catObj) => {
+                    const productCount = products.filter((p) => p.category === catObj.name).length;
                     return (
-                      <div
-                        key={cat}
-                        className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0"
-                      >
-                        <span className="text-sm font-medium">{cat}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {productCount} Artikel
-                          </Badge>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="w-7 h-7 hover:bg-destructive/10 hover:text-destructive"
-                                  disabled={!canDelete}
-                                  onClick={() => canDelete && requestDeleteCategory(cat)}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </span>
-                            </TooltipTrigger>
-                            {!canDelete && (
-                              <TooltipContent side="left">
-                                <p>Erst alle Produkte aus dieser Kategorie entfernen.</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        </div>
-                      </div>
+                      <CategoryRow
+                        key={catObj.id}
+                        category={catObj}
+                        productCount={productCount}
+                        onUpdate={updateCategory}
+                        onRequestDelete={requestDeleteCategory}
+                      />
                     );
                   })}
                 </div>

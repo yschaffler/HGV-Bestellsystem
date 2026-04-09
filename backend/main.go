@@ -104,6 +104,20 @@ func addCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func updateCategoryHandler(w http.ResponseWriter, r *http.Request) {
+	var c Category
+	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := updateCategory(c, DB); err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func deleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	var c Category
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
@@ -168,7 +182,7 @@ func getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getOpenOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
-	idString := r.FormValue("id")
+	idString := r.PathValue("id")
 	id, err := strconv.Atoi(idString)
 	if err != nil {
 		log.Printf("error parsing id from parameters: %v", err)
@@ -187,7 +201,7 @@ func getOpenOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getAllOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
-	idString := r.FormValue("id")
+	idString := r.PathValue("id")
 	id, err := strconv.Atoi(idString)
 	if err != nil {
 		log.Printf("error parsing id from parameters: %v", err)
@@ -235,6 +249,36 @@ func deleteOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func payOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	var body PayRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		log.Printf("error decoding pay orders from json: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := payTableItems(body.Table, body.Items, DB); err != nil {
+		log.Printf("error paying orders in database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func returnOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	var body PayRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		log.Printf("error decoding return orders from json: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := returnTableItems(body.Table, body.Items, DB); err != nil {
+		log.Printf("error returning orders in database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
@@ -244,6 +288,7 @@ func main() {
 	router.HandleFunc("/update/product/", updateProductHandler)
 	router.HandleFunc("/delete/product/", deleteProductHandler)
 	router.HandleFunc("/add/category/", addCategoryHandler)
+	router.HandleFunc("/update/category/", updateCategoryHandler)
 	router.HandleFunc("/delete/category/", deleteCategoryHandler)
 	router.HandleFunc("/get/all-orders/", getAllOrdersHandler)
 	router.HandleFunc("/get/unpaid-orders/", getUnpaidOrdersHandler)
@@ -252,6 +297,8 @@ func main() {
 	router.HandleFunc("/add/order/", createOrderHandler)
 	router.HandleFunc("/get/order/table/{id}", getOpenOrdersForTableHandler)
 	router.HandleFunc("/get/all-orders/table/{id}", getAllOrdersForTableHandler)
+	router.HandleFunc("/pay/orders/", payOrdersHandler)
+	router.HandleFunc("/return/orders/", returnOrdersHandler)
 
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))

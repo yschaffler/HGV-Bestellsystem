@@ -5,7 +5,7 @@ USE `bestellservice`;
 CREATE TABLE IF NOT EXISTS `produkt_kategorien` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(255) NOT NULL,
-    `color` VARCHAR(255)
+    `color` VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `test_produkte` (
@@ -27,10 +27,10 @@ CREATE TABLE IF NOT EXISTS `bestellungen` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Initiale Kategorien anlegen
-INSERT INTO `produkt_kategorien` (`name`) VALUES 
-('Getränke'),
-('Essen'),
-('Sonstiges');
+INSERT INTO `produkt_kategorien` (`name`, `color`) VALUES 
+('Getränke', '#3b82f6'),
+('Essen', '#ef4444'),
+('Sonstiges', '#64748b');
 
 -- Initiale Produkte anlegen
 INSERT INTO `test_produkte` (`name`, `price`, `product_category`) VALUES 

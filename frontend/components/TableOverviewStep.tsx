@@ -22,13 +22,14 @@ type OrderItem = {
   price: number;
 };
 
-type ApiCategory = { category_id: number; category_name: string };
+type ApiCategory = { category_id: number; category_name: string; category_color: string };
 type ApiProduct = { product_id: number; price: number; name: string; category: number };
 
 type Product = {
   id: string;
   name: string;
   category: string;
+  categoryColor: string;
   price: number;
 };
 
@@ -49,11 +50,7 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
 
   const [returnItems, setReturnItems] = useState<OrderItem[]>([]);
 
-  // TEMP: statische existierende Bestellungen (später vom Backend)
-  const [existingOrders, setExistingOrders] = useState<OrderItem[]>([
-    { productId: "beer", name: "Bier", amount: 2, price: 4.50 },
-    { productId: "cola", name: "Cola", amount: 1, price: 3.50 },
-  ]);
+  const [existingOrders, setExistingOrders] = useState<OrderItem[]>([]);
 
   const [checkoutItems, setCheckoutItems] = useState<OrderItem[]>([]);
 
@@ -61,35 +58,67 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const catRes = await fetch("/get/all-categories/");
-        const prodRes = await fetch("/get/all-products/");
-        if (!catRes.ok || !prodRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
-        
-        const catData: ApiCategory[] = await catRes.json();
-        const prodData: ApiProduct[] = await prodRes.json();
-        
-        const catMap = new Map<number, string>();
-        catData.forEach(c => catMap.set(c.category_id, c.category_name));
-        
-        const MAPPED_PRODUCTS: Product[] = prodData.map(p => ({
+  async function loadData() {
+    setIsLoading(true);
+    try {
+      const catRes = await fetch("/get/all-categories/");
+      const prodRes = await fetch("/get/all-products/");
+      const orderRes = await fetch(`/get/order/table/${table}`);
+
+      if (!catRes.ok || !prodRes.ok || !orderRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
+
+      const catData: ApiCategory[] = await catRes.json();
+      const prodData: ApiProduct[] = await prodRes.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orderData: any[] = await orderRes.json() || [];
+
+      const catMap = new Map<number, { name: string, color: string }>();
+      catData.forEach(c => catMap.set(c.category_id, { name: c.category_name, color: c.category_color || "#3b82f6" }));
+
+      const prodMap = new Map<number, ApiProduct>();
+      const MAPPED_PRODUCTS: Product[] = prodData.map(p => {
+        const catInfo = catMap.get(p.category) || { name: "Unbekannt", color: "#3b82f6" };
+        prodMap.set(p.product_id, p);
+        return {
           id: p.product_id.toString(),
           name: p.name,
-          category: catMap.get(p.category) || "Unbekannt",
+          category: catInfo.name,
+          categoryColor: catInfo.color,
           price: p.price,
-        }));
-        setProducts(MAPPED_PRODUCTS);
-      } catch (err) {
-        console.error(err);
-        setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
-      } finally {
-        setIsLoading(false);
-      }
+        };
+      });
+      setProducts(MAPPED_PRODUCTS);
+
+      const orderMap = new Map<number, OrderItem>();
+      orderData.forEach(o => {
+        if (o.order_payed) return;
+        const p = prodMap.get(o.order_product);
+        if (!p) return;
+
+        if (orderMap.has(o.order_product)) {
+          orderMap.get(o.order_product)!.amount += o.order_amount;
+        } else {
+          orderMap.set(o.order_product, {
+            productId: p.product_id.toString(),
+            name: p.name,
+            amount: o.order_amount,
+            price: o.order_price,
+          });
+        }
+      });
+      setExistingOrders(Array.from(orderMap.values()));
+
+    } catch (err) {
+      console.error(err);
+      setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
+    } finally {
+      setIsLoading(false);
     }
-    fetchProducts();
-  }, []);
+  }
+
+  useEffect(() => {
+    loadData();
+  }, [table]);
 
   const existingTotal = existingOrders.reduce((sum, item) => sum + (item.price * item.amount), 0);
   const newTotal = newItems.reduce((sum, item) => sum + (item.price * item.amount), 0);
@@ -213,33 +242,73 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
     if (navigator.vibrate) navigator.vibrate(15);
   }
 
-  function handleCheckoutConfirm() {
-    setExistingOrders(prev => {
-      return prev.map(order => {
-        const checkoutItem = checkoutItems.find(c => c.productId === order.productId);
-        if (checkoutItem) {
-          return { ...order, amount: order.amount - checkoutItem.amount };
-        }
-        return order;
-      }).filter(order => order.amount > 0);
-    });
-    setCheckoutItems([]);
-    setMode("menu");
-    if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
+  async function handleCheckoutConfirm() {
+    if (checkoutItems.length === 0) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch("/pay/orders/", {
+        method: "POST",
+        body: JSON.stringify({
+          table: table,
+          items: checkoutItems.map(c => ({ product: parseInt(c.productId), amount: c.amount }))
+        })
+      });
+      if (!res.ok) throw new Error("Abrechnung fehlgeschlagen");
+
+      if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
+      setCheckoutItems([]);
+      setMode("menu");
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setError("Fehler bei der Abrechnung");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  function saldo() {
+  async function saldo() {
     if (returnItems.length === 0 && newItems.length === 0) {
       setMode("menu");
       return;
     }
-    console.log({ table, returnItems, newItems });
-    if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
-    // fetch("/return", ...)
-    setReturnItems([]);
-    setNewItems([]);
-    setMode("menu");
-    onBack();
+    setIsLoading(true);
+    try {
+      if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
+
+      for (const item of newItems) {
+        await fetch("/add/order/", {
+          method: "POST",
+          body: JSON.stringify({
+            order_product: parseInt(item.productId),
+            order_amount: item.amount,
+            order_price: item.price,
+            order_payed: false,
+            order_table: table
+          })
+        });
+      }
+
+      if (returnItems.length > 0) {
+        await fetch("/return/orders/", {
+          method: "POST",
+          body: JSON.stringify({
+            table: table,
+            items: returnItems.map(r => ({ product: parseInt(r.productId), amount: r.amount }))
+          })
+        });
+      }
+
+      setReturnItems([]);
+      setNewItems([]);
+      setMode("menu");
+      onBack();
+    } catch (e) {
+      console.error(e);
+      setError("Fehler beim Verbuchen.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function handleScroll() {
@@ -435,6 +504,7 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
               variant="outline"
               className="h-full rounded-2xl text-lg font-bold border-2 text-destructive hover:text-destructive active:bg-destructive/10 active:scale-95 transition-transform flex-col gap-2"
               onClick={() => setMode("returning")}
+              disabled={existingOrders.length === 0}
             >
               <RefreshCcw className="w-8 h-8" />
               Retoure
@@ -452,7 +522,7 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                 </div>
               ) : products.length === 0 ? (
                 <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 text-center">
-                  <p>Es sind noch keine Produkte angelegt.<br/>Erstelle im Backend/Settings neue Produkte.</p>
+                  <p>Es sind noch keine Produkte angelegt.<br />Erstelle in den Settings neue Produkte.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
@@ -462,7 +532,8 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                       <Button
                         key={p.id}
                         variant="outline"
-                        className="relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 bg-background active:scale-95 transition-transform shadow-sm border-2 active:border-primary"
+                        className="relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 bg-background active:scale-95 transition-transform shadow-sm border-2 overflow-hidden"
+                        style={{ borderColor: p.categoryColor, backgroundColor: `${p.categoryColor}1A` }}
                         onClick={() => addNewItem(p)}
                       >
                         <span className="break-words px-1 text-center whitespace-normal leading-tight">{p.name}</span>
@@ -518,8 +589,8 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                       key={p.productId}
                       variant="outline"
                       className={`relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 active:scale-95 transition-transform shadow-sm border-2 ${returnCount > 0
-                          ? "bg-destructive/5 border-destructive/40 text-destructive active:border-destructive"
-                          : "bg-background active:border-destructive/60"
+                        ? "bg-destructive/5 border-destructive/40 text-destructive active:border-destructive"
+                        : "bg-background active:border-destructive/60"
                         }`}
                       onClick={() => addReturnItem(p.productId, p.name, p.price)}
                       disabled={remaining <= 0}
@@ -546,8 +617,8 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
               </Button>
               <Button
                 className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${returnItems.length > 0
-                    ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                    : "bg-muted-foreground"
+                  ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  : "bg-muted-foreground"
                   }`}
                 onClick={saldo}
               >
@@ -581,8 +652,8 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                       key={p.productId}
                       variant="outline"
                       className={`relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 active:scale-95 transition-transform shadow-sm border-2 ${checkoutCount > 0
-                          ? "bg-blue-500/5 border-blue-500/40 text-blue-600 active:border-blue-600"
-                          : "bg-background active:border-blue-500/60"
+                        ? "bg-blue-500/5 border-blue-500/40 text-blue-600 active:border-blue-600"
+                        : "bg-background active:border-blue-500/60"
                         }`}
                       onClick={() => addCheckoutItem(p.productId, p.name, p.price)}
                       disabled={remaining <= 0}
@@ -612,8 +683,8 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
                 <AlertDialogTrigger asChild>
                   <Button
                     className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${checkoutItems.length > 0
-                        ? "bg-blue-600 hover:bg-blue-700 text-white border border-blue-600"
-                        : "bg-muted-foreground text-background"
+                      ? "bg-blue-600 hover:bg-blue-700 text-white border border-blue-600"
+                      : "bg-muted-foreground text-background"
                       }`}
                     disabled={checkoutItems.length === 0}
                   >

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, Banknote, CreditCard, ChevronLeft, CheckCircle2, Delete } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-type ApiCategory = { category_id: number; category_name: string };
+type ApiCategory = { category_id: number; category_name: string; category_color: string };
 type ApiProduct = { product_id: number; price: number; name: string; category: number };
 
 type Category = string;
@@ -15,7 +15,7 @@ type Product = {
   name: string;
   category: Category;
   price: number;
-  color?: string;
+  categoryColor: string;
 };
 
 const QUICK_PAY_AMOUNTS = [5, 10, 20, 50, 100];
@@ -57,6 +57,7 @@ export default function BarPage() {
           name: p.name,
           category: catMap.get(p.category) || "Unbekannt",
           price: p.price,
+          categoryColor: catData.find(c => c.category_id === p.category)?.category_color || "#3b82f6",
         }));
         setProductsList(MAPPED_PRODUCTS);
       } catch (err) {
@@ -262,19 +263,18 @@ export default function BarPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
               {filteredProducts.map((product) => {
                 const inCartAmount = cart.find(c => c.id === product.id)?.amount || 0;
-                const hasCustomTheme = !!product.color;
 
                 return (
-                  <button
+                  <Button
                     key={product.id}
                     onClick={() => addToCart(product)}
                     className={`
-                      relative flex flex-col items-center justify-center p-6 h-36 rounded-3xl border-2 transition-all active:scale-[0.97]
-                      ${hasCustomTheme ? product.color : "bg-background border-border hover:border-primary/50 text-foreground"}
+                      relative flex flex-col items-center justify-center p-6 h-36 rounded-3xl border-2 transition-all active:scale-[0.97] bg-background
                       ${inCartAmount > 0 ? "ring-4 ring-primary/40 border-primary" : "shadow-sm hover:shadow-md"}
                     `}
+                    style={{ borderColor: product.categoryColor, backgroundColor: `${product.categoryColor}1A` }}
                   >
-                    <span className="font-bold text-xl md:text-2xl mb-1 text-center leading-tight">
+                    <span className="font-bold text-xl md:text-2xl mb-1 text-center leading-tight text-black">
                       {product.name}
                     </span>
                     <span className="font-semibold opacity-70 text-base">
@@ -286,7 +286,7 @@ export default function BarPage() {
                         {inCartAmount}
                       </div>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
