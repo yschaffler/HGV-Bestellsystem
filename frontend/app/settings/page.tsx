@@ -44,9 +44,17 @@ import {
   UtensilsCrossed,
   Settings2,
   Layers,
-  GripVertical,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  ColorPicker,
+  ColorPickerSelection,
+  ColorPickerHue,
+  ColorPickerAlpha,
+  ColorPickerFormat,
+} from "@/components/ui/color-picker"
+import Color from "color";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +63,12 @@ type Product = {
   name: string;
   price: number;
   category: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  color: string;
 };
 
 type DeleteDialog =
@@ -147,6 +161,112 @@ function ProductForm({ initial, categories, onSave, onCancel }: ProductFormProps
   );
 }
 
+// ─── Category Form (inline) ────────────────────────────────────────────────────
+// Für jede Kategorie kann ein Name und optional eine Farbe ausgewählt werden
+
+const PRESET_COLORS = [
+  "#ef4444", "#f97316", "#f59e0b", "#84cc16",
+  "#22c55e", "#10b981", "#06b6d4", "#3b82f6",
+  "#6366f1", "#d946ef", "#f43f5e", "#64748b"
+];
+
+type CategoryFormProps = {
+  initial?: Partial<Category>;
+  onSave: (p: Omit<Category, "id">) => void;
+  onCancel: () => void;
+};
+
+function CategoryForm({ initial, onSave, onCancel }: CategoryFormProps) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [color, setColor] = useState(initial?.color?.toString() ?? PRESET_COLORS[0]);
+
+  const valid = name.trim().length > 0 && color.trim().length > 0;
+
+  function handleSave() {
+    if (!valid) return;
+    onSave({ name: name.trim(), color: color.trim() });
+  }
+
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col gap-4 mt-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="category-name">Name</Label>
+        <Input
+          id="category-name"
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="z.B. Getränke"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Kategoriefarbe</Label>
+        <div className="flex flex-wrap gap-2 mt-1 relative">
+          {PRESET_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              className={`w-8 h-8 rounded-full border-2 focus:outline-none transition-all ${color === c
+                ? "border-primary scale-110 shadow-sm"
+                : "border-transparent hover:scale-105"
+                }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={`w-8 h-8 rounded-full border-2 flex flex-shrink-0 items-center justify-center cursor-pointer transition-all ${
+                  !PRESET_COLORS.includes(color)
+                    ? "border-primary scale-110 shadow-sm"
+                    : "border-dashed border-muted-foreground/50 hover:bg-muted/50 hover:scale-105 bg-background"
+                }`}
+                style={!PRESET_COLORS.includes(color) ? { backgroundColor: color } : {}}
+                title="Eigene Farbe"
+              >
+                {!PRESET_COLORS.includes(color) ? null : <PlusCircle className="w-4 h-4 text-muted-foreground" />}
+                <span className="sr-only">Eigene Farbe wählen</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-3 align-start" align="start">
+              <ColorPicker
+                value={color}
+                onChange={(rgbaArray) => {
+                  try {
+                    setColor(Color.rgb(rgbaArray).hex());
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                className="w-56"
+              >
+                <ColorPickerSelection className="h-40 rounded-lg mb-3" />
+                <ColorPickerHue />
+                <ColorPickerAlpha />
+                <div className="mt-3">
+                  <ColorPickerFormat />
+                </div>
+              </ColorPicker>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      <div className="flex gap-2 mt-2">
+        <Button variant="outline" className="flex-1" onClick={onCancel}>
+          <X className="w-4 h-4 mr-1" /> Abbrechen
+        </Button>
+        <Button className="flex-1" onClick={handleSave} disabled={!valid}>
+          <Check className="w-4 h-4 mr-1" /> Speichern
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Product Row ──────────────────────────────────────────────────────────────
 
 type ProductRowProps = {
@@ -212,7 +332,6 @@ export default function Settingspage() {
   const [categoryMap, setCategoryMap] = useState<Map<string, number>>(new Map());
   const [activeCategory, setActiveCategory] = useState<string>("Alle");
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [newCategoryInput, setNewCategoryInput] = useState("");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialog>(null);
 
@@ -301,13 +420,13 @@ export default function Settingspage() {
 
   // ─── Category actions ──────────────────────────────────────────────────────
 
-  async function addCategory() {
-    const trimmed = newCategoryInput.trim();
+  async function addCategory(newCat: Omit<Category, "id">) {
+    const trimmed = newCat.name.trim();
     if (!trimmed || categories.includes(trimmed)) return;
     try {
       const res = await fetch("/add/category/", {
         method: "POST",
-        body: JSON.stringify({ category_name: trimmed })
+        body: JSON.stringify({ category_name: trimmed, color: newCat.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht speichern");
       window.location.reload();
@@ -511,27 +630,7 @@ export default function Settingspage() {
 
                 {/* Kategorie hinzufügen */}
                 {showAddCategory ? (
-                  <div className="flex gap-2">
-                    <Input
-                      autoFocus
-                      value={newCategoryInput}
-                      onChange={(e) => setNewCategoryInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addCategory()}
-                      placeholder="Kategoriename"
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="hover:bg-destructive/10 hover:text-destructive shrink-0"
-                      onClick={() => { setShowAddCategory(false); setNewCategoryInput(""); }}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                    <Button size="icon" className="shrink-0" onClick={addCategory}>
-                      <Check className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <CategoryForm onSave={addCategory} onCancel={() => setShowAddCategory(false)} />
                 ) : (
                   <Button
                     variant="outline"
