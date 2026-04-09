@@ -15,7 +15,7 @@ type Product = {
   name: string;
   category: Category;
   price: number;
-  color?: string; // Optional field for button theme
+  color?: string;
 };
 
 const QUICK_PAY_AMOUNTS = [5, 10, 20, 50, 100];
@@ -34,11 +34,6 @@ export default function BarPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        //Mock product
-        const MProd: Product[] = [{ id: "1", name: "Test", category: "Test", price: 1.0 }]
-        setProductsList(MProd);
-        setCategories(["Alle", "Test"]);
-        return;
         // Backend URLs are relative since they're served by the same Go server
         const catRes = await fetch("/get/all-categories/");
         const prodRes = await fetch("/get/all-products/");
