@@ -277,7 +277,7 @@ export default function BarPage() {
                     <span className="font-bold text-xl md:text-2xl mb-1 text-center leading-tight text-black">
                       {product.name}
                     </span>
-                    <span className="font-semibold opacity-70 text-base">
+                    <span className="font-semibold opacity-70 text-base text-black">
                       {product.price.toFixed(2)}€
                     </span>
 
