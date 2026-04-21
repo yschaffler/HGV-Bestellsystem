@@ -2,20 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { UtensilsCrossed, Beer, Settings, LogIn } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-type Props = {
-  onWaiter: () => void;
-  onBar: () => void;
-  onSettings: () => void;
-  onLogin: () => void;
-};
 
-export default function Homepage({
-  onWaiter,
-  onBar,
-  onSettings,
-  onLogin,
-}: Props) {
+export default function Homepage() {
+  const router = useRouter()
   return (
     <div className="w-full min-h-screen flex items-center justify-center bg-muted/10 p-4">
       
@@ -37,7 +28,7 @@ export default function Homepage({
           
           {/* Kellner */}
           <Button
-            onClick={onWaiter}
+            onClick={() => router.push("/kellner")}
             className="h-32 sm:h-40 md:h-48 rounded-2xl text-lg sm:text-xl font-bold flex flex-col gap-2 active:scale-95 transition-transform shadow-md"
           >
             <UtensilsCrossed className="w-8 h-8 sm:w-10 sm:h-10" />
@@ -46,7 +37,7 @@ export default function Homepage({
 
           {/* Bar/Kasse */}
           <Button
-            onClick={onBar}
+            onClick={() => router.push("/bar")}
             className="h-32 sm:h-40 md:h-48 rounded-2xl text-lg sm:text-xl font-bold flex flex-col gap-2 bg-blue-600 hover:bg-blue-700 text-white active:scale-95 transition-transform shadow-md"
           >
             <Beer className="w-8 h-8 sm:w-10 sm:h-10" />
@@ -56,7 +47,7 @@ export default function Homepage({
           {/* Settings */}
           <Button
             variant="outline"
-            onClick={onSettings}
+            onClick={() => router.push("/settings")}
             className="h-32 sm:h-40 md:h-48 rounded-2xl text-lg sm:text-xl font-bold flex flex-col gap-2 border-2 active:bg-accent active:scale-95 transition-transform"
           >
             <Settings className="w-8 h-8 sm:w-10 sm:h-10" />
@@ -66,7 +57,7 @@ export default function Homepage({
           {/* Login */}
           <Button
             variant="outline"
-            onClick={onLogin}
+            onClick={() => router.push("/login")}
             className="h-32 sm:h-40 md:h-48 rounded-2xl text-lg sm:text-xl font-bold flex flex-col gap-2 border-2 active:bg-accent active:scale-95 transition-transform"
           >
             <LogIn className="w-8 h-8 sm:w-10 sm:h-10" />
