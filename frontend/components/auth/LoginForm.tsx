@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { UserCircle, Eye, EyeOff } from "lucide-react";
+import { Card, CardContent } from "../ui/card";
 
 export default function LoginForm() {
   const [username, setUsername] = useState("");
@@ -17,6 +18,7 @@ export default function LoginForm() {
       setError("Bitte alle Felder ausfüllen.");
       return;
     }
+
     setError("");
     setLoading(true);
 
@@ -37,67 +39,84 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="flex-1 flex flex-col p-4 pb-8 max-w-md mx-auto w-full overflow-y-auto min-h-0">
-      <div className="flex flex-col items-center mt-8">
-        <div className="bg-primary/10 p-4 rounded-full mb-4 text-primary">
-          <UserCircle className="w-12 h-12" />
-        </div>
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md rounded-3xl shadow-xl border-0">
+        <CardContent className="p-6 flex flex-col gap-6">
 
-        <h1 className="text-3xl font-bold mb-2 text-center text-foreground tracking-tight">
-          Anmeldung
-        </h1>
-        <p className="text-muted-foreground mb-8 text-center text-lg">
-          Bitte melde dich mit deinen Zugangsdaten an
-        </p>
-
-        <div className="w-full flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm text-muted-foreground">Benutzername</label>
-            <Input
-              placeholder="Benutzername eingeben"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="p-5"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm text-muted-foreground">Passwort</label>
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Passwort eingeben"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pr-10 p-5"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+          {/* Header */}
+          <div className="flex flex-col items-center text-center">
+            <div className="bg-primary/15 p-5 rounded-full text-primary shadow-sm mb-3">
+              <UserCircle className="w-14 h-14" />
             </div>
+
+            <h1 className="text-3xl font-bold tracking-tight">
+              Anmeldung
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Bitte melde dich mit deinen Zugangsdaten an
+            </p>
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
-              {error}
-            </p>
-          )}
-        </div>
-      </div>
+          {/* Form */}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm text-muted-foreground">
+                Benutzername
+              </label>
+              <Input
+                placeholder="Benutzername"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="h-14 text-base"
+              />
+            </div>
 
-      <div className="mt-auto pt-8">
-        <Button
-          className="w-full h-20 text-2xl font-bold rounded-2xl active:scale-95 transition-transform"
-          onClick={handleLogin}
-          disabled={!username || !password || loading}
-        >
-          {loading ? "Wird angemeldet..." : "Anmelden"}
-        </Button>
-      </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm text-muted-foreground">
+                Passwort
+              </label>
+
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Passwort"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-14 text-base pr-12"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <Eye className="w-5 h-5" />
+                  ) : (
+                    <EyeOff className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
+                {error}
+              </p>
+            )}
+          </div>
+
+          {/* Button */}
+          <Button
+            className="w-full h-16 text-lg font-semibold rounded-2xl shadow-md active:scale-95 transition-all"
+            onClick={handleLogin}
+            disabled={!username || !password || loading}
+          >
+            {loading ? "Wird angemeldet..." : "Anmelden"}
+          </Button>
+
+        </CardContent>
+      </Card>
     </div>
   );
 }
