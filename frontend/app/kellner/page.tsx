@@ -9,31 +9,18 @@ type Step = "login" | "table" | "table-overview";
 
 export default function Page() {
   const [step, setStep] = useState<Step>("login");
-  const [waiterId, setWaiterId] = useState<string | null>(null);
+  const [waiterId, setWaiterId] = useState<string | null>("123");
   const [table, setTable] = useState<number | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const storedWaiterId = localStorage.getItem("waiterId");
-    if (storedWaiterId) {
-      setWaiterId(storedWaiterId);
+    // const storedWaiterId = localStorage.getItem("waiterId");
+    if (waiterId) {
+      //setWaiterId(storedWaiterId);
       setStep("table");
     }
     setIsLoaded(true);
   }, []);
-
-  function handleLogin(id: string) {
-    localStorage.setItem("waiterId", id);
-    setWaiterId(id);
-    setStep("table");
-  }
-
-  function handleLogout() {
-    localStorage.removeItem("waiterId");
-    setWaiterId(null);
-    setTable(null);
-    setStep("login");
-  }
 
   if (!isLoaded) return null;
 
@@ -43,7 +30,7 @@ export default function Page() {
         <Header 
           waiterId={waiterId} 
           table={step === "table-overview" ? table : null} 
-          onLogout={handleLogout} 
+          onLogout={()=>{}} 
         />
       )}
       
