@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS `bestellungen` (
     FOREIGN KEY (`product`) REFERENCES `test_produkte` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `user` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `username` VARCHAR(15) NOT NULL,
+    `name` VARCHAR(50),
+    `password` VARCHAR(30) NOT NULL,
+    `role` VARCHAR(15)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Initiale Kategorien anlegen
 INSERT INTO `produkt_kategorien` (`name`, `color`) VALUES 
 ('Getränke', '#3b82f6'),

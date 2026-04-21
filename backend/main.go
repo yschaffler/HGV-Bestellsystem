@@ -284,19 +284,23 @@ func main() {
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
 	router.HandleFunc("/get/all-categories/", getCategories)
-	router.HandleFunc("/add/product/", addProduct)
-	router.HandleFunc("/update/product/", updateProductHandler)
-	router.HandleFunc("/delete/product/", deleteProductHandler)
-	router.HandleFunc("/add/category/", addCategoryHandler)
-	router.HandleFunc("/update/category/", updateCategoryHandler)
-	router.HandleFunc("/delete/category/", deleteCategoryHandler)
 	router.HandleFunc("/get/all-orders/", getAllOrdersHandler)
 	router.HandleFunc("/get/unpaid-orders/", getUnpaidOrdersHandler)
-	router.HandleFunc("/update/order/", updateOrdersHandler)
-	router.HandleFunc("/delete/order/", deleteOrdersHandler)
-	router.HandleFunc("/add/order/", createOrderHandler)
 	router.HandleFunc("/get/order/table/{id}", getOpenOrdersForTableHandler)
 	router.HandleFunc("/get/all-orders/table/{id}", getAllOrdersForTableHandler)
+
+	router.HandleFunc("/add/product/", addProduct)
+	router.HandleFunc("/add/category/", addCategoryHandler)
+	router.HandleFunc("/add/order/", createOrderHandler)
+
+	router.HandleFunc("/update/product/", updateProductHandler)
+	router.HandleFunc("/update/category/", updateCategoryHandler)
+	router.HandleFunc("/update/order/", updateOrdersHandler)
+	
+	router.HandleFunc("/delete/product/", deleteProductHandler)
+	router.HandleFunc("/delete/category/", deleteCategoryHandler)
+	router.HandleFunc("/delete/order/", deleteOrdersHandler)
+
 	router.HandleFunc("/pay/orders/", payOrdersHandler)
 	router.HandleFunc("/return/orders/", returnOrdersHandler)
 
