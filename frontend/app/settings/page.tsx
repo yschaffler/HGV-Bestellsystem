@@ -44,6 +44,9 @@ import {
   UtensilsCrossed,
   Settings2,
   Layers,
+  Users,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -71,12 +74,22 @@ type Category = {
   color: string;
 };
 
+type User = {
+  id: string;
+  username: string;
+  password: string;
+  role: "ADMIN" | "KELLNER";
+};
+
+
 type DeleteDialog =
   | { type: "product"; id: string; name: string }
   | { type: "category"; name: string }
+  | { type: "user"; id: string; name: string }
   | null;
 
 
+type ApiUser = { user_id: number; username: string; password: string; role: "ADMIN" | "KELLNER" };
 type ApiCategory = { category_id: number; category_name: string; category_color: string };
 type ApiProduct = { product_id: number; price: number; name: string; category: number };
 
@@ -266,6 +279,79 @@ function CategoryForm({ initial, onSave, onCancel }: CategoryFormProps) {
   );
 }
 
+// ─── User Form ──────────────────────────────────────────────────────────────
+type UserFormProps = {
+  initial?: Partial<User>;
+  onSave: (u: Omit<User, "id">) => void;
+  onCancel: () => void;
+};
+
+function UserForm({ initial, onSave, onCancel }: UserFormProps) {
+  const [username, setUsername] = useState(initial?.username ?? "");
+  const [password, setPassword] = useState(initial?.password ?? "");
+  const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState<"ADMIN" | "KELLNER">(initial?.role ?? "KELLNER");
+
+  const valid = username.trim().length > 0 && password.trim().length > 0;
+
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col gap-4 mt-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="user-name">Benutzername</Label>
+        <Input
+          id="user-name"
+          autoFocus
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="z.B. max_mustermann"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="user-password">Passwort</Label>
+        <div className="relative">
+          <Input
+            id="user-password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="pr-10"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 text-muted-foreground hover:text-foreground"
+            onClick={() => setShowPassword(prev => !prev)}
+          >
+            {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Rolle</Label>
+        <Select value={role} onValueChange={(v) => setRole(v as "ADMIN" | "KELLNER")}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="KELLNER">Kellner</SelectItem>
+            <SelectItem value="ADMIN">Admin</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={onCancel}>
+          <X className="w-4 h-4 mr-1" /> Abbrechen
+        </Button>
+        <Button className="flex-1" onClick={() => valid && onSave({ username: username.trim(), password: password.trim(), role })} disabled={!valid}>
+          <Check className="w-4 h-4 mr-1" /> Speichern
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Product Row ──────────────────────────────────────────────────────────────
 
 type ProductRowProps = {
@@ -394,6 +480,50 @@ function CategoryRow({ category, productCount, onUpdate, onRequestDelete }: Cate
   );
 }
 
+// ─── User Row ─────────────────────────────────────────────────────────────
+type UserRowProps = {
+  user: User;
+  onUpdate: (u: User) => void;
+  onRequestDelete: (id: string, name: string) => void;
+};
+
+function UserRow({ user, onUpdate, onRequestDelete }: UserRowProps) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <UserForm
+        initial={user}
+        onSave={(updated) => {
+          onUpdate({ ...updated, id: user.id });
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-border/40 last:border-0 group">
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm truncate">{user.username}</p>
+        <p className="text-xs text-muted-foreground">{"•".repeat(8)}</p>
+      </div>
+      <Badge variant={user.role === "ADMIN" ? "default" : "secondary"} className="shrink-0">
+        {user.role}
+      </Badge>
+      <div className="flex gap-1 shrink-0">
+        <Button variant="ghost" size="icon" className="w-8 h-8 hover:bg-primary/10 hover:text-primary" onClick={() => setEditing(true)}>
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+        <Button variant="ghost" size="icon" className="w-8 h-8 hover:bg-destructive/10 hover:text-destructive" onClick={() => onRequestDelete(user.id, user.username)}>
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Settingspage() {
@@ -403,6 +533,8 @@ export default function Settingspage() {
   const [activeCategory, setActiveCategory] = useState<string>("Alle");
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [showAddUser, setShowAddUser] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialog>(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -413,10 +545,13 @@ export default function Settingspage() {
       try {
         const catRes = await fetch("/get/all-categories/");
         const prodRes = await fetch("/get/all-products/");
-        if (!catRes.ok || !prodRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
+        const userRes = await fetch("/get/all-users/");
+
+        if (!catRes.ok || !prodRes.ok || !userRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
 
         const catData: ApiCategory[] = await catRes.json();
         const prodData: ApiProduct[] = await prodRes.json();
+        const userData: ApiUser[] = await userRes.json();
 
         const cMap = new Map<string, number>();
         const rMap = new Map<number, string>();
@@ -428,6 +563,13 @@ export default function Settingspage() {
           cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
         });
 
+        setUsers(userData.map(u => (
+          { 
+            id: u.user_id.toString(), 
+            username: u.username, 
+            password: u.password, 
+            role: u.role 
+          })));
         setCategoryMap(cMap);
         setCategories(cats);
 
@@ -524,6 +666,34 @@ export default function Settingspage() {
     setDeleteDialog({ type: "category", name });
   }
 
+  // ─── User actions ──────────────────────────────────────────────────────
+
+  async function addUser(u: Omit<User, "id">) {
+    try {
+      const res = await fetch("/add/user/", {
+        method: "POST",
+        body: JSON.stringify({ username: u.username, password: u.password, role: u.role })
+      });
+      if (!res.ok) throw new Error();
+      window.location.reload();
+    } catch { setError("Fehler beim Speichern des Nutzers"); }
+  }
+  
+  async function updateUser(updated: User) {
+    try {
+      const res = await fetch("/update/user/", {
+        method: "POST",
+        body: JSON.stringify({ user_id: parseInt(updated.id), username: updated.username, password: updated.password, role: updated.role })
+      });
+      if (!res.ok) throw new Error();
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+    } catch { setError("Fehler beim Updaten des Nutzers"); }
+  }
+  
+  function requestDeleteUser(id: string, name: string) {
+    setDeleteDialog({ type: "user", id, name });
+  }
+
   // ─── Confirm / cancel dialog ───────────────────────────────────────────────
 
   async function confirmDelete() {
@@ -549,6 +719,14 @@ export default function Settingspage() {
         }
         setCategories((prev) => prev.filter((c) => c.name !== deleteDialog.name));
         if (activeCategory === deleteDialog.name) setActiveCategory("Alle");
+      }
+      if (deleteDialog.type === "user") {
+        const res = await fetch("/delete/user/", {
+          method: "POST",
+          body: JSON.stringify({ user_id: parseInt(deleteDialog.id) })
+        });
+        if (!res.ok) throw new Error("Netzwerkfehler");
+        setUsers(prev => prev.filter(u => u.id !== deleteDialog.id));
       }
     } catch (err) {
       setError("Löschen fehlgeschlagen");
@@ -703,6 +881,34 @@ export default function Settingspage() {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Nutzer</CardTitle>
+                    <CardDescription>{users.length} Nutzer angelegt</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <div>
+                  {users.map(u => (
+                    <UserRow key={u.id} user={u} onUpdate={updateUser} onRequestDelete={requestDeleteUser} />
+                  ))}
+                </div>
+                {showAddUser ? (
+                  <UserForm onSave={addUser} onCancel={() => setShowAddUser(false)} />
+                ) : (
+                  <Button variant="outline" className="w-full border-dashed" onClick={() => setShowAddUser(true)}>
+                    <PlusCircle className="w-4 h-4 mr-2" /> Nutzer hinzufügen
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
           </div>
         )}
 
@@ -725,9 +931,8 @@ export default function Settingspage() {
               {/* Text */}
               <AlertDialogHeader className="text-center">
                 <AlertDialogTitle className="text-center">
-                  {deleteDialog?.type === "product"
-                    ? "Produkt löschen?"
-                    : "Kategorie löschen?"}
+                {deleteDialog?.type === "product" ? "Produkt löschen?" :
+                deleteDialog?.type === "category" ? "Kategorie löschen?" : "Nutzer löschen?"}
                 </AlertDialogTitle>
 
                 <AlertDialogDescription className="text-center">
