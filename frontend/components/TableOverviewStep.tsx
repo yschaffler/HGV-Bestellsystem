@@ -257,7 +257,6 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
 
       if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
       setCheckoutItems([]);
-      setMode("menu");
       await loadData();
     } catch (err) {
       console.error(err);
