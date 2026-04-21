@@ -31,3 +31,12 @@ type PayRequest struct {
 	Table int       `json:"table"`
 	Items []PayItem `json:"items"`
 }
+
+type User struct {
+	Id       int    `json:"user_id"`
+	Username string `json:"user_username"`
+	Name string `json:"user_realname"`
+	//base-64 string des hashs passwort
+	Password string `json:"user_password"`
+	Role     string `json:"user_role"`
+}

@@ -221,7 +221,7 @@ func getAllOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
 
 func updateOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	var o Order
-	if err := json.NewDecoder(r.Body); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
 		log.Printf("error decoding order from json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -236,7 +236,7 @@ func updateOrdersHandler(w http.ResponseWriter, r *http.Request) {
 
 func deleteOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	var o Order
-	if err := json.NewDecoder(r.Body); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
 		log.Printf("error decodign order from json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -279,6 +279,91 @@ func returnOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func createUserHandler(w http.ResponseWriter, r *http.Request) {
+	var u User
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		log.Printf("error decoding user data from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := createUser(u, DB); err != nil {
+		log.Printf("error creating user in the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func getUserByIdHandler(w http.ResponseWriter, r *http.Request) {
+	idString := r.PathValue("id")
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		log.Printf("error converting user id from string to int: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	u, err := getUserById(id, DB)
+	if err != nil {
+		log.Printf("error retrieving user from database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(u)
+	if err != nil {
+		log.Printf("error converting user data to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func getAllUsersHandler(w http.ResponseWriter, r *http.Request) {
+	users, err := getAllUsers(DB)
+	if err != nil {
+		log.Printf("error retrieving user data from the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(users)
+	if err != nil {
+		log.Printf("error converting user data to json: %v" ,err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	var u User
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		log.Printf("error decoding user data from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := updateUser(u, DB); err != nil {
+		log.Printf("error updating user in the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
+	var u User
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		log.Printf("error decoding user data from json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := deleteUser(u, DB); err != nil {
+		log.Printf("error deleting user from database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
@@ -286,20 +371,25 @@ func main() {
 	router.HandleFunc("/get/all-categories/", getCategories)
 	router.HandleFunc("/get/all-orders/", getAllOrdersHandler)
 	router.HandleFunc("/get/unpaid-orders/", getUnpaidOrdersHandler)
+	router.HandleFunc("/get/all-users/", getAllUsersHandler)
 	router.HandleFunc("/get/order/table/{id}", getOpenOrdersForTableHandler)
 	router.HandleFunc("/get/all-orders/table/{id}", getAllOrdersForTableHandler)
+	router.HandleFunc("/get/user/{id}", getUserByIdHandler)
 
 	router.HandleFunc("/add/product/", addProduct)
 	router.HandleFunc("/add/category/", addCategoryHandler)
 	router.HandleFunc("/add/order/", createOrderHandler)
+	router.HandleFunc("/add/user/", createUserHandler)
 
 	router.HandleFunc("/update/product/", updateProductHandler)
 	router.HandleFunc("/update/category/", updateCategoryHandler)
 	router.HandleFunc("/update/order/", updateOrdersHandler)
-	
+	router.HandleFunc("/update/user/", updateUserHandler)
+
 	router.HandleFunc("/delete/product/", deleteProductHandler)
 	router.HandleFunc("/delete/category/", deleteCategoryHandler)
 	router.HandleFunc("/delete/order/", deleteOrdersHandler)
+	router.HandleFunc("/delete/user/", deleteUserHandler)
 
 	router.HandleFunc("/pay/orders/", payOrdersHandler)
 	router.HandleFunc("/return/orders/", returnOrdersHandler)
