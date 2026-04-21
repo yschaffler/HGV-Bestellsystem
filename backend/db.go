@@ -198,7 +198,7 @@ func updateOrder(o Order, db *sql.DB) error {
 }
 
 func deleteOrder(o Order, db *sql.DB) error {
-	query := fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v", o.Id)
+	query := fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v;", o.Id)
 	_, err := db.Exec(query)
 	return err
 }
@@ -206,12 +206,12 @@ func deleteOrder(o Order, db *sql.DB) error {
 func payTableItems(table int, items []PayItem, db *sql.DB) error {
 	for _, item := range items {
 		amountToPay := item.Amount
-		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC", table, item.Product)
+		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC;", table, item.Product)
 		rows, err := db.Query(query)
 		if err != nil {
 			return err
 		}
-		
+
 		type orderRow struct {
 			id     int
 			amount int
@@ -236,10 +236,10 @@ func payTableItems(table int, items []PayItem, db *sql.DB) error {
 			}
 
 			if deduct == row.amount {
-				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET payed=true WHERE id=%v", row.id))
+				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET payed=true WHERE id=%v;", row.id))
 			} else {
-				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v", deduct, row.id))
-				_, _ = db.Exec(fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, `table`) VALUES (%v, %v, %v, true, %v)", item.Product, deduct, row.price, table))
+				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v;", deduct, row.id))
+				_, _ = db.Exec(fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, `table`) VALUES (%v, %v, %v, true, %v);", item.Product, deduct, row.price, table))
 			}
 			amountToPay -= deduct
 		}
@@ -250,12 +250,12 @@ func payTableItems(table int, items []PayItem, db *sql.DB) error {
 func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 	for _, item := range items {
 		amountToReturn := item.Amount
-		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC", table, item.Product)
+		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC;", table, item.Product)
 		rows, err := db.Query(query)
 		if err != nil {
 			return err
 		}
-		
+
 		type orderRow struct {
 			id     int
 			amount int
@@ -280,12 +280,62 @@ func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 			}
 
 			if deduct == row.amount {
-				_, _ = db.Exec(fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v", row.id))
+				_, _ = db.Exec(fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v;", row.id))
 			} else {
-				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v", deduct, row.id))
+				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v;", deduct, row.id))
 			}
 			amountToReturn -= deduct
 		}
 	}
 	return nil
+}
+
+func createUser(u User, db *sql.DB) error {
+	query := fmt.Sprintf("INSERT INTO user (username, name, password, role) VALUES (\"%v\", \"%v\", \"%v\", \"%v\");",
+		u.Username, u.Name, u.Password, u.Role)
+	_, err := db.Exec(query)
+	return err
+}
+
+func getUserById(id int, db *sql.DB) (User, error) {
+	query := fmt.Sprintf("SELECT * FROM user WHERE id=%v;", id)
+	rows := db.QueryRow(query)
+	var u User
+	err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)
+	if err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+func getAllUsers(db *sql.DB) ([]User, error) {
+	query := "SELECT * FROM user;"
+	rows, err := db.Query(query)
+	if err != nil {
+		return []User{}, err
+	}
+	defer rows.Close()
+	var users []User
+	for rows.Next() {
+		var u User
+		err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)
+		if err != nil {
+			return []User{}, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+func updateUser(u User, db *sql.DB) error {
+	query := fmt.Sprintf("UPDATE user SET username=\"%v\", name=\"%v\", password=\"%v\", role=\"%v\" WHERE id=%v",
+		u.Username, u.Name, u.Password, u.Role, u.Id)
+	_, err := db.Exec(query)
+	return err
+}
+
+func deleteUser(u User, db *sql.DB) error {
+	query := fmt.Sprintf("DELETE FROM user WHERE id=%v;", u.Id)
+	_, err := db.Exec(query)
+	return err
 }
