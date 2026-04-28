@@ -5,10 +5,10 @@ import { TableOverviewStep } from "@/components/TableOverviewStep";
 import { Header } from "@/components/Header";
 import { useState, useEffect } from "react";
 
-type Step = "login" | "table" | "table-overview";
+type Step = "table" | "table-overview";
 
 export default function Page() {
-  const [step, setStep] = useState<Step>("login");
+  const [step, setStep] = useState<Step>("table");
   const [waiterId, setWaiterId] = useState<string | null>("123");
   const [table, setTable] = useState<number | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);

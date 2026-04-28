@@ -31,6 +31,8 @@ export default function BarPage() {
   const [categories, setCategories] = useState<string[]>(["Alle"]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -112,10 +114,35 @@ export default function BarPage() {
     setGivenAmountStr("");
   }
 
-  function confirmPayment() {
+  async function confirmPayment() {
     if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
+    
+    try {
+      // Send one order request per cart item
+      await Promise.all(
+        cart.map((item) =>
+          fetch("/add/order/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              order_product: parseInt(item.id),
+              order_amount: item.amount,
+              order_price: item.price,
+              order_payed: true,
+              order_table: 0  // Bar hat keinen Tisch → 0 oder ein fester Wert
+            }),
+          })
+        )
+      );
+    } catch (err) {
+      console.error("Fehler beim Speichern der Bestellung:", err);
+      setPaymentError("Bestellung konnte nicht gespeichert werden. Bitte erneut versuchen.");
+      return; 
+    }
+
     setIsSuccess(true);
 
+    
     // Simulate transaction saving & close
     setTimeout(() => {
       setIsSuccess(false);
@@ -393,6 +420,16 @@ export default function BarPage() {
                     </div>
                   </div>
                 </div>
+                
+                {paymentError && (
+                  <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/30 text-destructive rounded-2xl px-5 py-4 animate-in slide-in-from-bottom-2">
+                    <span className="text-2xl">⚠️</span>
+                    <div>
+                      <p className="font-bold text-sm">Fehler beim Buchen</p>
+                      <p className="text-sm opacity-80">{paymentError}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Modal Actions */}
                 <div className="p-5 md:p-8 bg-muted/10 border-t flex gap-4 shrink-0 z-10">
