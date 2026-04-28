@@ -315,7 +315,7 @@ func getAllUsers(db *sql.DB) ([]User, error) {
 		return []User{}, err
 	}
 	defer rows.Close()
-	var users []User
+	users := make([]User, 0)
 	for rows.Next() {
 		var u User
 		err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)

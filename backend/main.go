@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -288,6 +290,10 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	h := sha256.New()
+	h.Write([]byte(u.Password))
+	hashedPassword := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	u.Password = hashedPassword
 	if err := createUser(u, DB); err != nil {
 		log.Printf("error creating user in the database: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -343,6 +349,10 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	h := sha256.New()
+	h.Write([]byte(u.Password))
+	hashedPassword := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	u.Password = hashedPassword
 	if err := updateUser(u, DB); err != nil {
 		log.Printf("error updating user in the database: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -373,6 +383,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	h := sha256.New()
+	h.Write([]byte(lrq.Password))
+	hashedPassword := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	lrq.Password = hashedPassword
 	u, err := getUserByUsername(lrq.Username, DB)
 	if err != nil {
 		log.Printf("error fetching user data from the database: %v", err)
