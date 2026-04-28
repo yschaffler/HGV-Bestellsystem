@@ -349,10 +349,12 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	h := sha256.New()
-	h.Write([]byte(u.Password))
-	hashedPassword := base64.StdEncoding.EncodeToString(h.Sum(nil))
-	u.Password = hashedPassword
+	if u.Password != "" {
+		h := sha256.New()
+		h.Write([]byte(u.Password))
+		hashedPassword := base64.StdEncoding.EncodeToString(h.Sum(nil))
+		u.Password = hashedPassword
+	}
 	if err := updateUser(u, DB); err != nil {
 		log.Printf("error updating user in the database: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)

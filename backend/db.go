@@ -339,8 +339,22 @@ func getUserByUsername(username string, db *sql.DB) (User, error) {
 }
 
 func updateUser(u User, db *sql.DB) error {
+	if u.Password == "" {
+		return updateUserWithoutPassword(u, db)
+	}
+	return updateUserWithPassword(u, db)
+}
+
+func updateUserWithPassword(u User, db *sql.DB) error {
 	query := fmt.Sprintf("UPDATE user SET username=\"%v\", name=\"%v\", password=\"%v\", role=\"%v\" WHERE id=%v",
 		u.Username, u.Name, u.Password, u.Role, u.Id)
+	_, err := db.Exec(query)
+	return err
+}
+
+func updateUserWithoutPassword(u User, db *sql.DB) error {
+	query := fmt.Sprintf("UPDATE user SET username=\"%v\", name=\"%v\", role=\"%v\" WHERE id=%v",
+		u.Username, u.Name, u.Role, u.Id)
 	_, err := db.Exec(query)
 	return err
 }
