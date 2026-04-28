@@ -40,3 +40,8 @@ type User struct {
 	Password string `json:"user_password"`
 	Role     string `json:"user_role"`
 }
+
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}

@@ -327,6 +327,17 @@ func getAllUsers(db *sql.DB) ([]User, error) {
 	return users, nil
 }
 
+func getUserByUsername(username string, db *sql.DB) (User, error) {
+	query := fmt.Sprintf("SELECT * FROM user WHERE username=\"%v\";", username)
+	row := db.QueryRow(query)
+	var u User
+	err := row.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)
+	if err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
 func updateUser(u User, db *sql.DB) error {
 	query := fmt.Sprintf("UPDATE user SET username=\"%v\", name=\"%v\", password=\"%v\", role=\"%v\" WHERE id=%v",
 		u.Username, u.Name, u.Password, u.Role, u.Id)

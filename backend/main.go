@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 func getProducts(w http.ResponseWriter, r *http.Request) {
@@ -326,7 +328,7 @@ func getAllUsersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.Marshal(users)
 	if err != nil {
-		log.Printf("error converting user data to json: %v" ,err)
+		log.Printf("error converting user data to json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -364,6 +366,72 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	var lrq LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&lrq); err != nil {
+		log.Printf("error parsing login request info: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	u, err := getUserByUsername(lrq.Username, DB)
+	if err != nil {
+		log.Printf("error fetching user data from the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if lrq.Password != u.Password {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id":       u.Id,
+		"username": u.Username,
+		"name":     u.Name,
+		"role":     u.Role,
+		"exp":      time.Now().Add(1 * time.Hour),
+	})
+	tokenString, _ := token.SignedString([]byte("SECRET_KEY"))
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    tokenString,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   86400,
+	})
+	w.WriteHeader(http.StatusOK)
+}
+
+func currentUser(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	token, _ := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
+		return []byte("SECRET_KEY"), nil
+	})
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		id := claims["id"].(int)
+		u, err := getUserById(id, DB)
+		if err != nil {
+			log.Printf("error retrieving user information: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		data, err := json.Marshal(u)
+		if err != nil {
+			log.Printf("error parsing json: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Write(data)
+	} else {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
@@ -393,6 +461,9 @@ func main() {
 
 	router.HandleFunc("/pay/orders/", payOrdersHandler)
 	router.HandleFunc("/return/orders/", returnOrdersHandler)
+
+	router.HandleFunc("/login/", loginHandler)
+	router.HandleFunc("/me/", currentUser)
 
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))
