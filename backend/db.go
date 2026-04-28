@@ -301,7 +301,7 @@ func getUserById(id int, db *sql.DB) (User, error) {
 	query := fmt.Sprintf("SELECT id, username, name, role FROM user WHERE id=%v;", id)
 	rows := db.QueryRow(query)
 	var u User
-	err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)
+	err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Role)
 	if err != nil {
 		return User{}, err
 	}
@@ -331,7 +331,7 @@ func getUserByUsername(username string, db *sql.DB) (User, error) {
 	query := fmt.Sprintf("SELECT id, username, name, role FROM user WHERE username=\"%v\";", username)
 	row := db.QueryRow(query)
 	var u User
-	err := row.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)
+	err := row.Scan(&u.Id, &u.Username, &u.Name, &u.Role)
 	if err != nil {
 		return User{}, err
 	}
