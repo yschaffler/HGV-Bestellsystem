@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2, Banknote, CreditCard, ChevronLeft, CheckCircle2, Delete } from "lucide-react";
+import { Minus, Plus, Trash2, Banknote, CreditCard, ChevronLeft, CheckCircle2, Delete, OctagonAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type ApiCategory = { category_id: number; category_name: string; category_color: string };
@@ -427,10 +427,10 @@ export default function BarPage() {
                 </div>
                 
                 {paymentError && (
-                  <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/30 text-destructive rounded-2xl px-5 py-4 animate-in slide-in-from-bottom-2">
-                    <span className="text-2xl">⚠️</span>
+                  <div className="flex items-center gap-3 bg-destructive/10 text-destructive px-5 py-4 animate-in slide-in-from-bottom-2">
+                    <OctagonAlertIcon />
                     <div>
-                      <p className="font-bold text-sm">Fehler beim Buchen</p>
+                      <p className="font-bold text-sm">Fehler beim Buchen!</p>
                       <p className="text-sm opacity-80">{paymentError}</p>
                     </div>
                   </div>
