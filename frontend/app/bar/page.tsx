@@ -116,10 +116,10 @@ export default function BarPage() {
 
   async function confirmPayment() {
     if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
-    
+    setPaymentError(null);
+
     try {
-      // Send one order request per cart item
-      await Promise.all(
+      const results = await Promise.all(
         cart.map((item) =>
           fetch("/add/order/", {
             method: "POST",
@@ -129,11 +129,16 @@ export default function BarPage() {
               order_amount: item.amount,
               order_price: item.price,
               order_payed: true,
-              order_table: 0  // Bar hat keinen Tisch → 0 oder ein fester Wert
+              order_table: 0
             }),
           })
         )
       );
+
+      // Prüfen ob alle Requests erfolgreich waren
+      const failed = results.some((r) => !r.ok);
+      if (failed) throw new Error("Server hat die Bestellung abgelehnt.");
+
     } catch (err) {
       console.error("Fehler beim Speichern der Bestellung:", err);
       setPaymentError("Bestellung konnte nicht gespeichert werden. Bitte erneut versuchen.");
