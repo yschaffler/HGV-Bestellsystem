@@ -13,21 +13,11 @@ export default function Page() {
   const [step, setStep] = useState<Step>("table");
   const waiterId = user?.username || null;
   const [table, setTable] = useState<number | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    if (waiterId) {
-      setStep("table");
-    }
-    setIsLoaded(true);
-  }, [waiterId]);
 
   const handleLogout = async () => {
     await fetch("/logout/", { method: "POST" });
     window.location.href = "/";
   };
-
-  if (!isLoaded) return null;
 
   return (
     <div className="h-[100dvh] flex flex-col bg-muted/20 overflow-hidden">
