@@ -30,9 +30,13 @@ CREATE TABLE IF NOT EXISTS `user` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `username` VARCHAR(15) NOT NULL,
     `name` VARCHAR(50),
-    `password` VARCHAR(30) NOT NULL,
+    `password` VARCHAR(100) NOT NULL,
     `role` VARCHAR(15)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Initialen Admin-Nutzer anlegen (Passwort: admin)
+INSERT INTO `user` (`username`, `name`, `password`, `role`) VALUES 
+('admin', 'Administrator', 'jGl25bVBBBW96Qi9Te4V37Fnqchz/Eu4qB9vKrRIqRg=', 'ADMIN');
 
 -- Initiale Kategorien anlegen
 INSERT INTO `produkt_kategorien` (`name`, `color`) VALUES 

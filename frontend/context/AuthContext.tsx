@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 type User = {
   username: string;
@@ -17,23 +18,26 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  refreshUser: () => {},
+  refreshUser: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const pathname = usePathname();
+  const router = useRouter();
+
   const fetchUser = async () => {
     try {
-      const res = await fetch("/me", {
+      const res = await fetch("/me/", {
         credentials: "include",
       });
 
       if (!res.ok) throw new Error();
 
       const data = await res.json();
-      setUser(data);
+      setUser({ username: data.user_username, name: data.user_name, role: data.user_role });
     } catch {
       setUser(null);
     } finally {
@@ -44,6 +48,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      const isProtected = pathname?.startsWith("/settings") || pathname?.startsWith("/kellner");
+
+      if (!user && isProtected) {
+        if (pathname) {
+          sessionStorage.setItem("redirectAfterLogin", pathname);
+        }
+        router.push("/login/");
+      }
+
+      if (user && pathname?.startsWith("/settings") && user.role !== "ADMIN") {
+        router.push("/");
+      }
+
+      if (user && pathname?.startsWith("/login")) {
+        router.push("/");
+      }
+    }
+  }, [user, loading, pathname, router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const isProtected = pathname?.startsWith("/settings") || pathname?.startsWith("/kellner");
+  if (!user && isProtected) {
+    return null;
+  }
+
+  if (user && pathname?.startsWith("/settings") && user.role !== "ADMIN") {
+    return null;
+  }
 
   return (
     <AuthContext.Provider value={{ user, loading, refreshUser: fetchUser }}>

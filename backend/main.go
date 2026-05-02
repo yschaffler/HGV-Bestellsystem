@@ -404,7 +404,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		"username": u.Username,
 		"name":     u.Name,
 		"role":     u.Role,
-		"exp":      time.Now().Add(1 * time.Hour),
+		"exp":      time.Now().Add(1 * time.Hour).Unix(),
 	})
 	tokenString, _ := token.SignedString([]byte("SECRET_KEY"))
 	http.SetCookie(w, &http.Cookie{
@@ -427,7 +427,12 @@ func currentUser(w http.ResponseWriter, r *http.Request) {
 		return []byte("SECRET_KEY"), nil
 	})
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		id := claims["id"].(int)
+		idFloat, ok := claims["id"].(float64)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		id := int(idFloat)
 		u, err := getUserById(id, DB)
 		if err != nil {
 			log.Printf("error retrieving user information: %v", err)
@@ -446,6 +451,17 @@ func currentUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   -1,
+	})
+	w.WriteHeader(http.StatusOK)
 }
 
 func main() {
@@ -478,8 +494,9 @@ func main() {
 	router.HandleFunc("/pay/orders/", payOrdersHandler)
 	router.HandleFunc("/return/orders/", returnOrdersHandler)
 
-	router.HandleFunc("/login/", loginHandler)
+	router.HandleFunc("POST /login/", loginHandler)
 	router.HandleFunc("/me/", currentUser)
+	router.HandleFunc("POST /logout/", logoutHandler)
 
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))

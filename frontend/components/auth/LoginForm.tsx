@@ -22,7 +22,7 @@ export default function LoginForm() {
     setError("");
     setLoading(true);
 
-    const res = await fetch("/login", {
+    const res = await fetch("/login/", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -32,7 +32,9 @@ export default function LoginForm() {
     setLoading(false);
 
     if (res.ok) {
-      window.location.href = "/";
+      const redirectUrl = sessionStorage.getItem("redirectAfterLogin") || "/";
+      sessionStorage.removeItem("redirectAfterLogin");
+      window.location.href = redirectUrl;
     } else {
       setError("Benutzername oder Passwort ist falsch.");
     }

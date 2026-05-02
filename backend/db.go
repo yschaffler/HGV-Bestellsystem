@@ -291,14 +291,14 @@ func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 }
 
 func createUser(u User, db *sql.DB) error {
-	query := fmt.Sprintf("INSERT INTO user (username, name, password, role) VALUES (\"%v\", \"%v\", \"%v\", \"%v\");",
+	query := fmt.Sprintf("INSERT INTO `user` (`username`, `name`, `password`, `role`) VALUES (\"%v\", \"%v\", \"%v\", \"%v\");",
 		u.Username, u.Name, u.Password, u.Role)
 	_, err := db.Exec(query)
 	return err
 }
 
 func getUserById(id int, db *sql.DB) (User, error) {
-	query := fmt.Sprintf("SELECT id, username, name, role FROM user WHERE id=%v;", id)
+	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `role` FROM `user` WHERE `id`=%v;", id)
 	rows := db.QueryRow(query)
 	var u User
 	err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Role)
@@ -309,7 +309,7 @@ func getUserById(id int, db *sql.DB) (User, error) {
 }
 
 func getAllUsers(db *sql.DB) ([]User, error) {
-	query := "SELECT id, username, name, role FROM user;"
+	query := "SELECT `id`, `username`, `name`, `role` FROM `user`;"
 	rows, err := db.Query(query)
 	if err != nil {
 		return []User{}, err
@@ -328,10 +328,10 @@ func getAllUsers(db *sql.DB) ([]User, error) {
 }
 
 func getUserByUsername(username string, db *sql.DB) (User, error) {
-	query := fmt.Sprintf("SELECT id, username, name, role FROM user WHERE username=\"%v\";", username)
+	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `password`, `role` FROM `user` WHERE `username`=\"%v\";", username)
 	row := db.QueryRow(query)
 	var u User
-	err := row.Scan(&u.Id, &u.Username, &u.Name, &u.Role)
+	err := row.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)
 	if err != nil {
 		return User{}, err
 	}
@@ -346,21 +346,21 @@ func updateUser(u User, db *sql.DB) error {
 }
 
 func updateUserWithPassword(u User, db *sql.DB) error {
-	query := fmt.Sprintf("UPDATE user SET username=\"%v\", name=\"%v\", password=\"%v\", role=\"%v\" WHERE id=%v",
+	query := fmt.Sprintf("UPDATE `user` SET `username`=\"%v\", `name`=\"%v\", `password`=\"%v\", `role`=\"%v\" WHERE `id`=%v",
 		u.Username, u.Name, u.Password, u.Role, u.Id)
 	_, err := db.Exec(query)
 	return err
 }
 
 func updateUserWithoutPassword(u User, db *sql.DB) error {
-	query := fmt.Sprintf("UPDATE user SET username=\"%v\", name=\"%v\", role=\"%v\" WHERE id=%v",
+	query := fmt.Sprintf("UPDATE `user` SET `username`=\"%v\", `name`=\"%v\", `role`=\"%v\" WHERE `id`=%v",
 		u.Username, u.Name, u.Role, u.Id)
 	_, err := db.Exec(query)
 	return err
 }
 
 func deleteUser(u User, db *sql.DB) error {
-	query := fmt.Sprintf("DELETE FROM user WHERE id=%v;", u.Id)
+	query := fmt.Sprintf("DELETE FROM `user` WHERE `id`=%v;", u.Id)
 	_, err := db.Exec(query)
 	return err
 }
