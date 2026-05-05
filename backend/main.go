@@ -512,6 +512,8 @@ func main() {
 	router.HandleFunc("/me/", currentUser)
 	router.HandleFunc("POST /logout/", logoutHandler)
 
+	router.HandleFunc("/reset/orders/", resetOrdersHandler)
+
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))
 	router.Handle("/", fs)
