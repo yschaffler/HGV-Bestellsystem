@@ -326,7 +326,7 @@ func getAllUsersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.Marshal(users)
 	if err != nil {
-		log.Printf("error converting user data to json: %v" ,err)
+		log.Printf("error converting user data to json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -364,6 +364,25 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func statsPDFHandler(w http.ResponseWriter, r *http.Request) {
+	if err := generateProductReport(DB); err != nil {
+		log.Printf("error generating report report: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Serve the generated file directly in the response
+	data, err := os.ReadFile("produkte.pdf")
+	if err != nil {
+		log.Printf("error reading generated pdf: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"Report.pdf\"")
+	w.Write(data)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
@@ -393,6 +412,8 @@ func main() {
 
 	router.HandleFunc("/pay/orders/", payOrdersHandler)
 	router.HandleFunc("/return/orders/", returnOrdersHandler)
+
+	router.HandleFunc("/stats/pdf/", statsPDFHandler)
 
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))

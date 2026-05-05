@@ -52,8 +52,8 @@ func buildPdf(title string, cols []ReportColumn, rows [][]string) core.Maroto {
 	return m
 }
 
-func generateProductReport(db *sql.DB) error {
-	products, err := getAllProducts(db)
+func generateProductReport(DB *sql.DB) error {
+	products, err := getAllProducts(DB)
 	if err != nil {
 		return fmt.Errorf("failed to get products: %v", err)
 	}
