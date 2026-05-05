@@ -464,6 +464,20 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func resetOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	if err := resetOrders(DB); err != nil {
+		log.Printf("error resetting the database: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := resetAutoIncrementForOrders(DB); err != nil {
+		log.Printf("failed to reset auto increment for the order table: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()

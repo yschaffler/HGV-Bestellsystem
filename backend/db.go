@@ -364,3 +364,15 @@ func deleteUser(u User, db *sql.DB) error {
 	_, err := db.Exec(query)
 	return err
 }
+
+func resetOrders(db *sql.DB) error {
+	query := "DELETE * FROM `bestellungen`;"
+	_, err := db.Exec(query)
+	return err
+}
+
+func resetAutoIncrementForOrders(db *sql.DB) error {
+	query := "ALTER TABLE `bestellungen` AUTO_INCREMENT = 1;"
+	_, err := db.Exec(query)
+	return err
+}
