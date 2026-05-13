@@ -3,7 +3,7 @@
 import { TableStep } from "@/components/TableStep";
 import { TableOverviewStep } from "@/components/TableOverviewStep";
 import { Header } from "@/components/Header";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 type Step = "table" | "table-overview";
@@ -30,7 +30,6 @@ export default function Page() {
       )}
 
       <main className="flex-1 flex flex-col min-h-0">
-
         {step === "table" && waiterId && (
           <TableStep
             onNext={(t) => {
@@ -44,8 +43,6 @@ export default function Page() {
           <TableOverviewStep
             waiterId={waiterId}
             table={table}
-            onCheckout={() => alert("Abrechnen noch nicht implementiert")}
-            onReturn={() => alert("Warenretoure noch nicht implementiert")}
             onBack={() => {
               setTable(null);
               setStep("table");

@@ -1,8 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Receipt, ArrowLeft, RefreshCcw, CheckCircle2, Minus, Plus, Trash2, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  RefreshCcw,
+  Receipt,
+  History,
+  Minus,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Loader2,
+  ShoppingCart,
+  X,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +27,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-type OrderItem = {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type CartItem = {
   productId: string;
   name: string;
   amount: number;
@@ -33,84 +47,125 @@ type Product = {
   price: number;
 };
 
+type HistoryOrder = {
+  productId: string;
+  name: string;
+  amount: number;
+  price: number;
+  payed: boolean;
+};
+
 type Props = {
   waiterId: string;
   table: number;
-  onCheckout: () => void;
-  onReturn: () => void;
   onBack: () => void;
 };
 
-type Mode = "menu" | "ordering" | "returning" | "checkout";
+type Mode = "home" | "ordering" | "returning" | "history";
 
-export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props) {
-  const [mode, setMode] = useState<Mode>("menu");
-  const [newItems, setNewItems] = useState<OrderItem[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const [returnItems, setReturnItems] = useState<OrderItem[]>([]);
+function fmt(n: number) {
+  return n.toFixed(2).replace(".", ",") + " €";
+}
 
-  const [existingOrders, setExistingOrders] = useState<OrderItem[]>([]);
+// ─── Component ────────────────────────────────────────────────────────────────
 
-  const [checkoutItems, setCheckoutItems] = useState<OrderItem[]>([]);
-
+export function TableOverviewStep({ table, onBack }: Props) {
+  const [mode, setMode] = useState<Mode>("home");
   const [products, setProducts] = useState<Product[]>([]);
+  const [existingOrders, setExistingOrders] = useState<CartItem[]>([]);
+  const [historyOrders, setHistoryOrders] = useState<HistoryOrder[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [returnItems, setReturnItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{ name: string; color: string }[]>([]);
+
+  // ── Data loading ────────────────────────────────────────────────────────────
 
   async function loadData() {
     setIsLoading(true);
+    setError(null);
     try {
-      const catRes = await fetch("/get/all-categories/");
-      const prodRes = await fetch("/get/all-products/");
-      const orderRes = await fetch(`/get/order/table/${table}`);
-
-      if (!catRes.ok || !prodRes.ok || !orderRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
+      const [catRes, prodRes, orderRes] = await Promise.all([
+        fetch("/get/all-categories/"),
+        fetch("/get/all-products/"),
+        fetch(`/get/order/table/${table}`),
+      ]);
+      if (!catRes.ok || !prodRes.ok || !orderRes.ok)
+        throw new Error("Serverfehler");
 
       const catData: ApiCategory[] = await catRes.json();
       const prodData: ApiProduct[] = await prodRes.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const orderData: any[] = await orderRes.json() || [];
+      const orderData: any[] = (await orderRes.json()) || [];
 
-      const catMap = new Map<number, { name: string, color: string }>();
-      catData.forEach(c => catMap.set(c.category_id, { name: c.category_name, color: c.category_color || "#3b82f6" }));
+      const catMap = new Map<number, { name: string; color: string }>();
+      catData.forEach((c) =>
+        catMap.set(c.category_id, {
+          name: c.category_name,
+          color: c.category_color || "#6366f1",
+        })
+      );
+
+      const uniqueCats: { name: string; color: string }[] = [];
+      const seenCats = new Set<string>();
+      catData.forEach((c) => {
+        if (!seenCats.has(c.category_name)) {
+          seenCats.add(c.category_name);
+          uniqueCats.push({ name: c.category_name, color: c.category_color || "#6366f1" });
+        }
+      });
+      setCategories(uniqueCats);
 
       const prodMap = new Map<number, ApiProduct>();
-      const MAPPED_PRODUCTS: Product[] = prodData.map(p => {
-        const catInfo = catMap.get(p.category) || { name: "Unbekannt", color: "#3b82f6" };
+      const mapped: Product[] = prodData.map((p) => {
+        const cat = catMap.get(p.category) || { name: "Sonstiges", color: "#6366f1" };
         prodMap.set(p.product_id, p);
         return {
           id: p.product_id.toString(),
           name: p.name,
-          category: catInfo.name,
-          categoryColor: catInfo.color,
+          category: cat.name,
+          categoryColor: cat.color,
           price: p.price,
         };
       });
-      setProducts(MAPPED_PRODUCTS);
+      setProducts(mapped);
 
-      const orderMap = new Map<number, OrderItem>();
-      orderData.forEach(o => {
-        if (o.order_payed) return;
+      // Separate open vs paid orders
+      const openMap = new Map<number, CartItem>();
+      const allHistory: HistoryOrder[] = [];
+
+      orderData.forEach((o) => {
         const p = prodMap.get(o.order_product);
         if (!p) return;
-
-        if (orderMap.has(o.order_product)) {
-          orderMap.get(o.order_product)!.amount += o.order_amount;
-        } else {
-          orderMap.set(o.order_product, {
-            productId: p.product_id.toString(),
-            name: p.name,
-            amount: o.order_amount,
-            price: o.order_price,
-          });
+        allHistory.push({
+          productId: p.product_id.toString(),
+          name: p.name,
+          amount: o.order_amount,
+          price: o.order_price,
+          payed: !!o.order_payed,
+        });
+        if (!o.order_payed) {
+          if (openMap.has(o.order_product)) {
+            openMap.get(o.order_product)!.amount += o.order_amount;
+          } else {
+            openMap.set(o.order_product, {
+              productId: p.product_id.toString(),
+              name: p.name,
+              amount: o.order_amount,
+              price: o.order_price,
+            });
+          }
         }
       });
-      setExistingOrders(Array.from(orderMap.values()));
-
-    } catch (err) {
-      console.error(err);
-      setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
+      setExistingOrders(Array.from(openMap.values()));
+      setHistoryOrders(allHistory);
+    } catch (e) {
+      console.error(e);
+      setError("Verbindungsfehler. Seite neu laden.");
     } finally {
       setIsLoading(false);
     }
@@ -120,162 +175,37 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
     loadData();
   }, [table]);
 
-  const existingTotal = existingOrders.reduce((sum, item) => sum + (item.price * item.amount), 0);
-  const newTotal = newItems.reduce((sum, item) => sum + (item.price * item.amount), 0);
-  const returnTotal = returnItems.reduce((sum, item) => sum + (item.price * item.amount), 0);
-  const checkoutTotal = checkoutItems.reduce((sum, item) => sum + (item.price * item.amount), 0);
-  const totalAmount = existingTotal + newTotal;
+  // ── Cart helpers ─────────────────────────────────────────────────────────────
 
-  // ─── Bestellen ────────────────────────────────────────────────────────────
-
-  function addNewItem(product: Product) {
-    setNewItems((prev) => {
-      const existing = prev.find((i) => i.productId === product.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.productId === product.id ? { ...i, amount: i.amount + 1 } : i
-        );
-      }
+  function addToCart(product: Product) {
+    if (navigator.vibrate) navigator.vibrate(12);
+    setCart((prev) => {
+      const ex = prev.find((i) => i.productId === product.id);
+      if (ex) return prev.map((i) => (i.productId === product.id ? { ...i, amount: i.amount + 1 } : i));
       return [...prev, { productId: product.id, name: product.name, amount: 1, price: product.price }];
     });
-    if (navigator.vibrate) navigator.vibrate(15);
-    handleScroll();
   }
 
-  function updateNewItemAmount(productId: string, delta: number) {
-    setNewItems((prev) =>
-      prev.map((i) => {
-        if (i.productId !== productId) return i;
-        const updated = i.amount + delta;
-        if (updated <= 0) return i;
-        return { ...i, amount: updated };
-      })
-    );
-    if (navigator.vibrate) navigator.vibrate(15);
-  }
-
-  function removeNewItem(productId: string) {
-    setNewItems((prev) => prev.filter((i) => i.productId !== productId));
+  function changeCart(productId: string, delta: number) {
     if (navigator.vibrate) navigator.vibrate(10);
-  }
-
-  // ─── Retoure ──────────────────────────────────────────────────────────────
-
-  function addReturnItem(productId: string, name: string, price: number) {
-    const ordered = existingOrders.find(i => i.productId === productId)?.amount || 0;
-    const currentReturn = returnItems.find(i => i.productId === productId)?.amount || 0;
-    if (currentReturn >= ordered) return;
-
-    setReturnItems((prev) => {
-      const existing = prev.find((i) => i.productId === productId);
-      if (existing) {
-        return prev.map((i) =>
-          i.productId === productId ? { ...i, amount: i.amount + 1 } : i
-        );
-      }
-      return [...prev, { productId, name, amount: 1, price }];
-    });
-    if (navigator.vibrate) navigator.vibrate(15);
-    handleScroll();
-  }
-
-  function updateReturnItemAmount(productId: string, delta: number) {
-    setReturnItems((prev) =>
-      prev.map((i) => {
-        if (i.productId !== productId) return i;
-        const ordered = existingOrders.find(eo => eo.productId === productId)?.amount || 0;
-        const updated = i.amount + delta;
-        if (updated <= 0) return i;
-        if (updated > ordered) return i;
-        return { ...i, amount: updated };
-      })
+    setCart((prev) =>
+      prev
+        .map((i) => (i.productId === productId ? { ...i, amount: i.amount + delta } : i))
+        .filter((i) => i.amount > 0)
     );
-    if (navigator.vibrate) navigator.vibrate(15);
   }
 
-  function removeReturnItem(productId: string) {
-    setReturnItems((prev) => prev.filter((i) => i.productId !== productId));
-    if (navigator.vibrate) navigator.vibrate(10);
-  }
+  const cartTotal = cart.reduce((s, i) => s + i.price * i.amount, 0);
+  const cartCount = cart.reduce((s, i) => s + i.amount, 0);
 
-  // ─── Abrechnen ────────────────────────────────────────────────────────────
+  // ── Confirm order + instant checkout ─────────────────────────────────────────
 
-  function addCheckoutItem(productId: string, name: string, price: number) {
-    const ordered = existingOrders.find(i => i.productId === productId)?.amount || 0;
-    const currentCheckout = checkoutItems.find(i => i.productId === productId)?.amount || 0;
-    if (currentCheckout >= ordered) return;
-
-    setCheckoutItems((prev) => {
-      const existing = prev.find((i) => i.productId === productId);
-      if (existing) {
-        return prev.map((i) =>
-          i.productId === productId ? { ...i, amount: i.amount + 1 } : i
-        );
-      }
-      return [...prev, { productId, name, amount: 1, price }];
-    });
-    if (navigator.vibrate) navigator.vibrate(15);
-    handleScroll();
-  }
-
-  function updateCheckoutItemAmount(productId: string, delta: number) {
-    setCheckoutItems((prev) =>
-      prev.map((i) => {
-        if (i.productId !== productId) return i;
-        const ordered = existingOrders.find(eo => eo.productId === productId)?.amount || 0;
-        const updated = i.amount + delta;
-        if (updated <= 0) return i;
-        if (updated > ordered) return i;
-        return { ...i, amount: updated };
-      })
-    );
-    if (navigator.vibrate) navigator.vibrate(15);
-  }
-
-  function removeCheckoutItem(productId: string) {
-    setCheckoutItems((prev) => prev.filter((i) => i.productId !== productId));
-    if (navigator.vibrate) navigator.vibrate(10);
-  }
-
-  function selectAllForCheckout() {
-    setCheckoutItems([...existingOrders]);
-    if (navigator.vibrate) navigator.vibrate(15);
-  }
-
-  async function handleCheckoutConfirm() {
-    if (checkoutItems.length === 0) return;
+  async function handleOrderAndPay() {
+    if (cart.length === 0) return;
     setIsLoading(true);
     try {
-      const res = await fetch("/pay/orders/", {
-        method: "POST",
-        body: JSON.stringify({
-          table: table,
-          items: checkoutItems.map(c => ({ product: parseInt(c.productId), amount: c.amount }))
-        })
-      });
-      if (!res.ok) throw new Error("Abrechnung fehlgeschlagen");
-
-      if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
-      setCheckoutItems([]);
-      await loadData();
-    } catch (err) {
-      console.error(err);
-      setError("Fehler bei der Abrechnung");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function saldo() {
-    if (returnItems.length === 0 && newItems.length === 0) {
-      setMode("menu");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
-
-      for (const item of newItems) {
+      // 1. Book orders
+      for (const item of cart) {
         await fetch("/add/order/", {
           method: "POST",
           body: JSON.stringify({
@@ -283,441 +213,516 @@ export function TableOverviewStep({ table, onCheckout, onReturn, onBack }: Props
             order_amount: item.amount,
             order_price: item.price,
             order_payed: false,
-            order_table: table
-          })
+            order_table: table,
+          }),
         });
       }
+      // 2. Immediately pay them
+      await fetch("/pay/orders/", {
+        method: "POST",
+        body: JSON.stringify({
+          table,
+          items: cart.map((c) => ({ product: parseInt(c.productId), amount: c.amount })),
+        }),
+      });
 
-      if (returnItems.length > 0) {
-        await fetch("/return/orders/", {
-          method: "POST",
-          body: JSON.stringify({
-            table: table,
-            items: returnItems.map(r => ({ product: parseInt(r.productId), amount: r.amount }))
-          })
-        });
-      }
-
-      setReturnItems([]);
-      setNewItems([]);
-      setMode("menu");
-      onBack();
+      if (navigator.vibrate) navigator.vibrate([15, 40, 15]);
+      setCart([]);
+      setMode("home");
+      await loadData();
     } catch (e) {
       console.error(e);
-      setError("Fehler beim Verbuchen.");
+      setError("Fehler beim Kassieren.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  function handleScroll() {
-    setTimeout(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-    }, 100);
+  // ── Return helpers ────────────────────────────────────────────────────────────
+
+  function addReturn(item: CartItem) {
+    const currentReturn = returnItems.find((i) => i.productId === item.productId)?.amount || 0;
+    if (currentReturn >= item.amount) return;
+    if (navigator.vibrate) navigator.vibrate(12);
+    setReturnItems((prev) => {
+      const ex = prev.find((i) => i.productId === item.productId);
+      if (ex) return prev.map((i) => (i.productId === item.productId ? { ...i, amount: i.amount + 1 } : i));
+      return [...prev, { ...item, amount: 1 }];
+    });
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  function changeReturn(productId: string, delta: number) {
+    if (navigator.vibrate) navigator.vibrate(10);
+    setReturnItems((prev) =>
+      prev
+        .map((i) => (i.productId === productId ? { ...i, amount: i.amount + delta } : i))
+        .filter((i) => i.amount > 0)
+    );
+  }
+
+  const returnTotal = returnItems.reduce((s, i) => s + i.price * i.amount, 0);
+
+  async function handleReturnConfirm() {
+    if (returnItems.length === 0) return;
+    setIsLoading(true);
+    try {
+      await fetch("/return/orders/", {
+        method: "POST",
+        body: JSON.stringify({
+          table,
+          items: returnItems.map((r) => ({ product: parseInt(r.productId), amount: r.amount })),
+        }),
+      });
+      if (navigator.vibrate) navigator.vibrate([15, 40, 15]);
+      setReturnItems([]);
+      setMode("home");
+      await loadData();
+    } catch (e) {
+      console.error(e);
+      setError("Fehler bei der Retoure.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // ── Filtered products ─────────────────────────────────────────────────────────
+
+  const filteredProducts = activeCategory
+    ? products.filter((p) => p.category === activeCategory)
+    : products;
+
+  // ── Open tab total ────────────────────────────────────────────────────────────
+  const openTotal = existingOrders.reduce((s, i) => s + i.price * i.amount, 0);
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 flex flex-col w-full min-h-0 bg-muted/10 overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-zinc-950 text-white overflow-hidden">
+      {/* Error Banner */}
       {error && (
-        <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center shrink-0 z-50">
-          {error}
+        <div className="bg-red-600 text-white px-4 py-2 text-sm font-semibold text-center flex items-center justify-between shrink-0 z-50">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="ml-2 opacity-70 hover:opacity-100">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {mode === "checkout" ? (
-        <div className="flex flex-col h-full w-full bg-background">
-          {/* Top Half: Tisch Produkte */}
-          <div className="flex-1 p-4 pb-2 flex flex-col overflow-hidden min-h-0">
-            <div className="flex items-center justify-between mb-2 shrink-0">
-              <h2 className="text-xl font-bold tracking-tight">Tisch {table}</h2>
-              <Button variant="outline" size="sm" onClick={selectAllForCheckout}>Alles abkassieren</Button>
-            </div>
-            <div className="bg-muted/10 rounded-2xl shadow-inner border p-4 flex-1 flex flex-col overflow-hidden">
-              <h3 className="font-semibold text-muted-foreground mb-2 text-xs uppercase tracking-wider shrink-0">Auf dem Tisch</h3>
-              <div className="flex-1 overflow-y-auto pr-2">
-                <div className="flex flex-col gap-2">
-                  {existingOrders.map(p => {
-                    const checkoutCount = checkoutItems.find(i => i.productId === p.productId)?.amount || 0;
-                    const remaining = p.amount - checkoutCount;
-                    if (remaining <= 0) return null;
-                    return (
-                      <div
-                        key={`top-${p.productId}`}
-                        className="flex justify-between items-center py-3 px-4 bg-background hover:bg-muted/50 rounded-xl border cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
-                        onClick={() => addCheckoutItem(p.productId, p.name, p.price)}
-                      >
-                        <div className="flex gap-3 items-center">
-                          <span className="font-bold text-lg bg-muted/20 w-8 h-8 flex items-center justify-center rounded-lg shadow-sm border">{remaining}</span>
-                          <span className="font-medium text-lg">{p.name}</span>
-                        </div>
-                        <span className="font-semibold text-muted-foreground">{(p.price * remaining).toFixed(2)}€</span>
-                      </div>
-                    )
-                  })}
-                  {existingOrders.every(p => (p.amount - (checkoutItems.find(i => i.productId === p.productId)?.amount || 0)) <= 0) && (
-                    <div className="py-8 text-center text-muted-foreground opacity-50 flex flex-col items-center">
-                      <CheckCircle2 className="w-8 h-8 mb-2" />
-                      <p className="text-sm">Alles ausgewählt</p>
-                    </div>
-                  )}
-                </div>
+      {/* ── HOME ──────────────────────────────────────────────────────────────── */}
+      {mode === "home" && (
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="px-5 pt-6 pb-4 shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-zinc-500 text-xs font-semibold uppercase tracking-widest">Tisch</p>
+                <h1 className="text-4xl font-black text-white leading-none">{table}</h1>
               </div>
+              {openTotal > 0 && (
+                <div className="text-right">
+                  <p className="text-zinc-500 text-xs font-semibold uppercase tracking-widest">Offen</p>
+                  <p className="text-2xl font-black text-amber-400">{fmt(openTotal)}</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Bottom Half: Rechnung */}
-          <div className="flex-[1.2] p-4 pt-2 flex flex-col overflow-hidden min-h-0 bg-blue-50/30 dark:bg-blue-950/10 border-t">
-            <div className="bg-background rounded-2xl shadow-sm border border-blue-500/20 p-4 flex-1 flex flex-col overflow-hidden relative">
-              <div className="flex justify-between items-center mb-3 shrink-0">
-                <h3 className="font-semibold text-blue-600 text-xs uppercase tracking-wider">Rechnung (Ausgewählt)</h3>
-                <span className="font-bold text-blue-600 text-xl">{checkoutTotal.toFixed(2)}€</span>
-              </div>
-              <div className="flex-1 overflow-y-auto pr-2">
-                <div className="flex flex-col gap-2">
-                  {checkoutItems.map(item => (
-                    <div
-                      key={`bot-${item.productId}`}
-                      className="flex justify-between items-center py-3 px-4 bg-blue-500/5 hover:bg-blue-500/10 rounded-xl border border-blue-500/30 cursor-pointer active:scale-[0.98] transition-transform"
-                      onClick={() => item.amount > 1 ? updateCheckoutItemAmount(item.productId, -1) : removeCheckoutItem(item.productId)}
-                    >
-                      <div className="flex gap-3 items-center">
-                        <span className="font-bold text-lg text-blue-600 bg-background w-8 h-8 flex items-center justify-center rounded-lg shadow-sm border border-blue-500/20">{item.amount}</span>
-                        <span className="font-bold text-blue-600 text-lg">{item.name}</span>
-                      </div>
-                      <span className="font-bold text-blue-600">{(item.price * item.amount).toFixed(2)}€</span>
-                    </div>
-                  ))}
-                  {checkoutItems.length === 0 && (
-                    <div className="py-8 text-center text-blue-600/50 flex flex-col items-center">
-                      <Receipt className="w-8 h-8 mb-2" />
-                      <p className="text-sm">Tippe oben auf Artikel um sie hinzuzufügen</p>
-                    </div>
-                  )}
-                </div>
+          {/* Open items preview */}
+          {existingOrders.length > 0 && (
+            <div className="mx-4 mb-4 bg-zinc-900 rounded-2xl px-4 py-3 shrink-0 border border-zinc-800">
+              <p className="text-zinc-500 text-xs font-semibold uppercase tracking-widest mb-2">Offene Positionen</p>
+              <div className="flex flex-col gap-1">
+                {existingOrders.slice(0, 4).map((item) => (
+                  <div key={item.productId} className="flex justify-between text-sm">
+                    <span className="text-zinc-300">{item.amount}× {item.name}</span>
+                    <span className="text-zinc-400">{fmt(item.price * item.amount)}</span>
+                  </div>
+                ))}
+                {existingOrders.length > 4 && (
+                  <p className="text-zinc-600 text-xs mt-1">+{existingOrders.length - 4} weitere…</p>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Actions */}
-            <div className="mt-3 shrink-0 flex gap-2 h-16">
-              <Button variant="outline" className="w-20 h-full rounded-2xl bg-background" onClick={() => { setCheckoutItems([]); setMode("menu"); }}>
-                <ArrowLeft className="w-6 h-6" />
-              </Button>
+          {/* Main action grid */}
+          <div className="flex-1 px-4 pb-4 grid grid-cols-2 gap-3">
+            {/* Bestellen – primary, full-height left */}
+            <button
+              onClick={() => setMode("ordering")}
+              className="col-span-2 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.97] transition-all rounded-3xl flex flex-col items-center justify-center gap-3 shadow-lg shadow-indigo-900/40 py-6"
+            >
+              <div className="bg-indigo-500/50 rounded-2xl p-4">
+                <ShoppingCart className="w-10 h-10 text-white" />
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-white">Bestellen & Kassieren</p>
+                <p className="text-indigo-300 text-sm mt-0.5">Sofortbezahlung</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setMode("returning")}
+              disabled={existingOrders.length === 0}
+              className="bg-zinc-900 hover:bg-zinc-800 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none transition-all rounded-3xl flex flex-col items-center justify-center gap-3 border border-zinc-800 py-6"
+            >
+              <div className="bg-zinc-800 rounded-2xl p-3">
+                <RefreshCcw className="w-7 h-7 text-red-400" />
+              </div>
+              <p className="text-base font-bold text-white">Warenretoure</p>
+            </button>
+
+            <button
+              onClick={() => setMode("history")}
+              className="bg-zinc-900 hover:bg-zinc-800 active:scale-[0.97] transition-all rounded-3xl flex flex-col items-center justify-center gap-3 border border-zinc-800 py-6"
+            >
+              <div className="bg-zinc-800 rounded-2xl p-3">
+                <History className="w-7 h-7 text-zinc-300" />
+              </div>
+              <p className="text-base font-bold text-white">Rechnungen</p>
+            </button>
+
+            <button
+              onClick={onBack}
+              className="col-span-2 bg-zinc-900 hover:bg-zinc-800 active:scale-[0.97] transition-all rounded-2xl flex items-center justify-center gap-2 py-4 border border-zinc-800"
+            >
+              <ArrowLeft className="w-5 h-5 text-zinc-400" />
+              <span className="text-zinc-300 font-semibold">Zurück zur Tischauswahl</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ORDERING ──────────────────────────────────────────────────────────── */}
+      {mode === "ordering" && (
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 pt-5 pb-3 shrink-0">
+            <button
+              onClick={() => { setCart([]); setMode("home"); }}
+              className="bg-zinc-800 hover:bg-zinc-700 active:scale-95 transition-all rounded-xl p-2.5"
+            >
+              <ArrowLeft className="w-5 h-5 text-zinc-300" />
+            </button>
+            <div className="flex-1">
+              <h2 className="text-xl font-black text-white leading-none">Neue Bestellung</h2>
+              <p className="text-zinc-500 text-xs mt-0.5">Tisch {table} · Sofortkasse</p>
+            </div>
+            {cartCount > 0 && (
+              <div className="bg-indigo-600 rounded-xl px-3 py-1.5 text-white font-bold text-sm">
+                {cartCount} × {fmt(cartTotal)}
+              </div>
+            )}
+          </div>
+
+          {/* Category filter */}
+          {categories.length > 1 && (
+            <div className="px-4 pb-2 shrink-0 overflow-x-auto">
+              <div className="flex gap-2 w-max">
+                <button
+                  onClick={() => setActiveCategory(null)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeCategory === null ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400"}`}
+                >
+                  Alle
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    key={cat.name}
+                    onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name)}
+                    style={{ backgroundColor: activeCategory === cat.name ? cat.color : undefined, borderColor: cat.color }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${activeCategory === cat.name ? "text-white" : "bg-transparent text-zinc-400"}`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Product grid */}
+          <div className="flex-1 overflow-y-auto px-4 pb-2">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full text-zinc-500">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" /> Lade…
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2.5 pb-2">
+                {filteredProducts.map((p) => {
+                  const count = cart.find((i) => i.productId === p.id)?.amount || 0;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => addToCart(p)}
+                      style={{ borderColor: `${p.categoryColor}60`, backgroundColor: `${p.categoryColor}14` }}
+                      className="relative border rounded-2xl py-4 px-2 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all text-center"
+                    >
+                      <span className="text-white font-bold text-sm leading-tight">{p.name}</span>
+                      <span className="text-zinc-400 text-xs font-medium">{fmt(p.price)}</span>
+                      {count > 0 && (
+                        <div
+                          style={{ backgroundColor: p.categoryColor }}
+                          className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-black shadow-lg"
+                        >
+                          {count}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Cart preview + confirm */}
+          <div className="shrink-0 bg-zinc-900 border-t border-zinc-800">
+            {cart.length > 0 && (
+              <div className="px-4 pt-3 pb-2 max-h-48 overflow-y-auto">
+                <div className="flex flex-col gap-1.5">
+                  {cart.map((item) => (
+                    <div key={item.productId} className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 bg-zinc-800 rounded-lg">
+                        <button onClick={() => changeCart(item.productId, -1)} className="p-1.5 text-zinc-400 hover:text-white active:scale-90 transition-all">
+                          {item.amount === 1 ? <Trash2 className="w-3.5 h-3.5 text-red-400" /> : <Minus className="w-3.5 h-3.5" />}
+                        </button>
+                        <span className="text-white font-bold text-sm w-5 text-center">{item.amount}</span>
+                        <button onClick={() => changeCart(item.productId, 1)} className="p-1.5 text-zinc-400 hover:text-white active:scale-90 transition-all">
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <span className="flex-1 text-sm text-zinc-200 font-medium">{item.name}</span>
+                      <span className="text-zinc-400 text-sm">{fmt(item.price * item.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 flex gap-3">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
-                    className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${checkoutItems.length > 0 ? "bg-blue-600 hover:bg-blue-700 text-white border border-blue-600" : "bg-muted-foreground text-background"}`}
-                    disabled={checkoutItems.length === 0}
+                    disabled={cart.length === 0}
+                    className="flex-1 h-14 rounded-2xl text-base font-black bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white active:scale-[0.97] transition-all shadow-lg shadow-indigo-900/30"
                   >
-                    <CheckCircle2 className="mr-2 w-6 h-6" />
-                    {checkoutItems.length > 0 ? "KASSIEREN" : "Schließen"}
+                    <CheckCircle2 className="w-5 h-5 mr-2" />
+                    {cart.length > 0 ? `Kassieren · ${fmt(cartTotal)}` : "Artikel auswählen"}
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="w-[90%] sm:max-w-[425px] rounded-2xl">
+                <AlertDialogContent className="w-[90%] max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 text-white">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Barzahlung bestätigen</AlertDialogTitle>
+                    <AlertDialogTitle className="text-white">Bezahlung bestätigen</AlertDialogTitle>
                     <AlertDialogDescription asChild>
-                      <div className="mt-2 text-base">
-                        Bitte bestätige den Erhalt von <strong className="text-foreground font-bold text-lg">{checkoutTotal.toFixed(2)}€</strong> in Bar.
+                      <div className="text-zinc-400 mt-2">
+                        <p className="mb-3">Gesamtbetrag:</p>
+                        <p className="text-3xl font-black text-white">{fmt(cartTotal)}</p>
+                        <div className="mt-3 flex flex-col gap-1">
+                          {cart.map((i) => (
+                            <div key={i.productId} className="flex justify-between text-sm">
+                              <span className="text-zinc-300">{i.amount}× {i.name}</span>
+                              <span className="text-zinc-400">{fmt(i.price * i.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter className="flex-row gap-2 sm:justify-end">
-                    <AlertDialogCancel className="flex-1 mt-0">Abbrechen</AlertDialogCancel>
-                    <AlertDialogAction className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleCheckoutConfirm}>Kassieren</AlertDialogAction>
+                  <AlertDialogFooter className="flex-row gap-2 mt-4">
+                    <AlertDialogCancel className="flex-1 mt-0 bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 rounded-xl">
+                      Abbrechen
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold"
+                      onClick={handleOrderAndPay}
+                    >
+                      Kassieren
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             </div>
           </div>
         </div>
-      ) : (
-        <>
-          {/* Top: Aktuelle Bestellungen */}
-          <div className="flex-[3] p-4 flex flex-col overflow-hidden min-h-[40vh] max-h-[50vh]">
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <h2 className="text-xl font-bold tracking-tight">Tischübersicht</h2>
-              <span className="bg-primary/10 text-primary px-3 py-1 rounded-full font-bold">
-                Tisch {table}
-              </span>
+      )}
+
+      {/* ── RETURNING ─────────────────────────────────────────────────────────── */}
+      {mode === "returning" && (
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 pt-5 pb-3 shrink-0">
+            <button
+              onClick={() => { setReturnItems([]); setMode("home"); }}
+              className="bg-zinc-800 hover:bg-zinc-700 active:scale-95 transition-all rounded-xl p-2.5"
+            >
+              <ArrowLeft className="w-5 h-5 text-zinc-300" />
+            </button>
+            <div className="flex-1">
+              <h2 className="text-xl font-black text-white leading-none">Warenretoure</h2>
+              <p className="text-zinc-500 text-xs mt-0.5">Tisch {table} · Artikel zurückgeben</p>
             </div>
-
-            <div className="bg-background rounded-2xl shadow-sm border p-4 flex-1 flex flex-col overflow-hidden">
-              <h3 className="font-semibold text-muted-foreground mb-2 text-xs uppercase tracking-wider shrink-0">
-                Aktuelle Rechnung
-              </h3>
-
-              <div className="flex-1 overflow-y-auto w-full pr-2">
-                <div className="flex flex-col gap-2">
-
-                  {/* Bonierte Bestellungen */}
-                  {existingOrders.map((item) => {
-                    const checkoutAmount = checkoutItems.find(c => c.productId === item.productId)?.amount || 0;
-                    const displayAmount = item.amount - checkoutAmount;
-                    if (displayAmount <= 0) return null;
-                    return (
-                      <div key={`existing-${item.productId}`} className="flex justify-between items-center py-2 border-b border-border/40">
-                        <div className="flex gap-2">
-                          <span className="font-bold">{displayAmount}x</span>
-                          <span>{item.name}</span>
-                        </div>
-                        <span className="font-medium text-muted-foreground">
-                          {(item.price * displayAmount).toFixed(2)}€
-                        </span>
-                      </div>
-                    );
-                  })}
-
-
-
-                  {/* Neue (noch nicht bonierte) Bestellungen */}
-                  {newItems.map((item) => (
-                    <div key={`new-${item.productId}`} className="flex justify-between items-center py-3 px-2 bg-primary/5 rounded-xl border border-primary/20 mt-1 relative">
-                      <div className="flex gap-2 items-center flex-1">
-                        <div className="flex items-center bg-background border rounded-lg mr-2 shadow-sm shrink-0">
-                          <Button
-                            variant="ghost"
-                            className="w-8 h-8 flex items-center justify-center text-foreground hover:bg-primary/20 active:bg-primary/30"
-                            onClick={() => item.amount > 1 ? updateNewItemAmount(item.productId, -1) : removeNewItem(item.productId)}
-                          >
-                            {item.amount > 1 ? <Minus className="w-3 h-3" /> : <Trash2 className="w-3 h-3 text-destructive" />}
-                          </Button>
-                          <span className="w-6 text-center font-bold text-sm">{item.amount}</span>
-                          <Button
-                            variant="ghost"
-                            className="w-8 h-8 flex items-center justify-center text-primary hover:bg-primary/20 active:bg-primary/30"
-                            onClick={() => updateNewItemAmount(item.productId, 1)}
-                          >
-                            <Plus className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <span className="font-bold">{item.name}</span>
-                      </div>
-                      <span className="font-bold text-primary shrink-0">
-                        {(item.price * item.amount).toFixed(2)}€
-                      </span>
-                    </div>
-                  ))}
-
-                  {/* Retoure-Positionen (rot markiert) */}
-                  {returnItems.map((item) => (
-                    <div key={`ret-${item.productId}`} className="flex justify-between items-center py-3 px-2 bg-destructive/5 rounded-xl border border-destructive/30 mt-1 relative">
-                      <div className="flex gap-2 items-center flex-1">
-                        <div className="flex items-center bg-background border border-destructive/20 rounded-lg mr-2 shadow-sm shrink-0">
-                          <Button
-                            variant="ghost"
-                            className="w-8 h-8 flex items-center justify-center hover:bg-destructive/10 active:bg-destructive/20"
-                            onClick={() => item.amount > 1 ? updateReturnItemAmount(item.productId, -1) : removeReturnItem(item.productId)}
-                          >
-                            {item.amount > 1 ? <Minus className="w-3 h-3 text-destructive" /> : <Trash2 className="w-3 h-3 text-destructive" />}
-                          </Button>
-                          <span className="w-6 text-center font-bold text-sm text-destructive">{item.amount}</span>
-                          <Button
-                            variant="ghost"
-                            className="w-8 h-8 flex items-center justify-center hover:bg-destructive/10 active:bg-destructive/20"
-                            onClick={() => updateReturnItemAmount(item.productId, 1)}
-                          >
-                            <Plus className="w-3 h-3 text-destructive" />
-                          </Button>
-                        </div>
-                        <span className="font-bold text-destructive">{item.name}</span>
-                      </div>
-                      <span className="font-bold text-destructive shrink-0">
-                        -{(item.price * item.amount).toFixed(2)}€
-                      </span>
-                    </div>
-                  ))}
-
-                  {existingOrders.length === 0 && newItems.length === 0 && returnItems.length === 0 && checkoutItems.length === 0 && !isLoading && (
-                    <div className="py-8 text-center text-muted-foreground opacity-50 flex flex-col items-center">
-                      <Receipt className="w-8 h-8 mb-2" />
-                      <p className="text-sm">Noch keine Artikel gebucht</p>
-
-                    </div>
-                  )}
-                  {isLoading && (
-                    <div className="py-8 text-center text-muted-foreground opacity-50 flex flex-col items-center">
-                      <Loader2 className="w-8 h-8 mb-2 animate-spin" />
-                      <p className="text-sm">Lade Artikel...</p>
-                    </div>
-                  )}
-                  <div ref={scrollRef} />
-                </div>
+            {returnItems.length > 0 && (
+              <div className="bg-red-900/60 border border-red-700 rounded-xl px-3 py-1.5 text-red-300 font-bold text-sm">
+                -{fmt(returnTotal)}
               </div>
-
-              <div className="mt-3 pt-3 border-t shrink-0 flex justify-between items-center">
-                <span className="font-bold text-lg">Summe</span>
-                <span className="font-bold text-2xl text-primary">{totalAmount.toFixed(2)}€</span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Bottom: Menü / Bestellen / Retoure */}
-          <div className="flex-[4] sm:flex-[3] bg-background/95 backdrop-blur shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-t flex flex-col overflow-hidden">
+          {/* Banner */}
+          <div className="mx-4 mb-3 shrink-0 bg-red-950/40 border border-red-800/50 rounded-2xl px-4 py-3">
+            <p className="text-red-400 text-xs font-semibold uppercase tracking-widest text-center">
+              Tippe auf einen Artikel um ihn zur Retoure hinzuzufügen
+            </p>
+          </div>
 
-            {/* STATE A: Hauptmenü */}
-            {mode === "menu" && (
-              <div className="p-4 flex-1 grid grid-cols-2 grid-rows-2 gap-4">
-                <Button
-                  className="h-full rounded-2xl text-xl font-bold bg-primary active:scale-95 transition-transform shadow-md flex-col gap-2"
-                  onClick={() => setMode("ordering")}
-                >
-                  <PlusCircle className="w-8 h-8" />
-                  Bestellen
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-full rounded-2xl text-xl font-bold border-2 active:bg-accent active:scale-95 transition-transform flex-col gap-2"
-                  onClick={() => setMode("checkout")}
-                >
-                  <Receipt className="w-8 h-8" />
-                  Abrechnen
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-full rounded-2xl text-lg font-bold border-2 active:bg-accent active:scale-95 transition-transform flex-col gap-2"
-                  onClick={onBack}
-                >
-                  <ArrowLeft className="w-8 h-8" />
-                  Zurück
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-full rounded-2xl text-lg font-bold border-2 text-destructive hover:text-destructive active:bg-destructive/10 active:scale-95 transition-transform flex-col gap-2"
-                  onClick={() => setMode("returning")}
-                  disabled={existingOrders.length === 0}
-                >
-                  <RefreshCcw className="w-8 h-8" />
-                  Retoure
-                </Button>
-              </div>
-            )}
-
-            {/* STATE B: Produkt-Grid (Bestellen) */}
-            {mode === "ordering" && (
-              <div className="p-2 pt-3 flex-1 flex flex-col overflow-hidden h-full">
-                <div className="flex-1 overflow-y-auto px-2 pb-2">
-                  {isLoading ? (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground font-semibold">
-                      Produkte laden...
-                    </div>
-                  ) : products.length === 0 ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 text-center">
-                      <p>Es sind noch keine Produkte angelegt.<br />Erstelle in den Settings neue Produkte.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      {products.map((p) => {
-                        const orderedCount = newItems.find((i) => i.productId === p.id)?.amount || 0;
-                        return (
-                          <Button
-                            key={p.id}
-                            variant="outline"
-                            className="relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 bg-background active:scale-95 transition-transform shadow-sm border-2 overflow-hidden"
-                            style={{ borderColor: p.categoryColor, backgroundColor: `${p.categoryColor}1A` }}
-                            onClick={() => addNewItem(p)}
-                          >
-                            <span className="break-words px-1 text-center whitespace-normal leading-tight">{p.name}</span>
-                            {orderedCount > 0 && (
-                              <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md">
-                                {orderedCount}
-                              </div>
-                            )}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-2 pt-0 shrink-0 flex gap-2 h-16 mt-2">
-                  <Button
-                    variant="outline"
-                    className="w-20 h-full rounded-2xl"
-                    onClick={() => setMode("menu")}
-                  >
-                    <ArrowLeft className="w-6 h-6" />
-                  </Button>
-                  <Button
-                    className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${newItems.length > 0 ? "bg-primary" : "bg-muted-foreground"}`}
-                    onClick={saldo}
-                  >
-                    <CheckCircle2 className="mr-2 w-6 h-6" />
-                    {newItems.length > 0 ? "SALDO" : "Schließen"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* STATE C: Produkt-Grid (Retoure) – gleiche Struktur, aber rot */}
-            {mode === "returning" && (
-              <div className="p-2 pt-3 flex-1 flex flex-col overflow-hidden h-full">
-                {/* Roter Hinweis-Banner */}
-                <div className="mx-2 mb-2 px-3 py-1.5 bg-destructive/10 border border-destructive/30 rounded-xl shrink-0">
-                  <p className="text-xs font-semibold text-destructive text-center tracking-wide uppercase">
-                    Warenretoure
-                  </p>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-2 pb-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    {existingOrders.map((p) => {
-                      const returnCount = returnItems.find((i) => i.productId === p.productId)?.amount || 0;
-                      const remaining = p.amount - returnCount;
-
-                      return (
-                        <Button
-                          key={p.productId}
-                          variant="outline"
-                          className={`relative h-24 text-base sm:text-lg font-bold rounded-2xl flex flex-col gap-1 active:scale-95 transition-transform shadow-sm border-2 ${returnCount > 0
-                            ? "bg-destructive/5 border-destructive/40 text-destructive active:border-destructive"
-                            : "bg-background active:border-destructive/60"
-                            }`}
-                          onClick={() => addReturnItem(p.productId, p.name, p.price)}
-                          disabled={remaining <= 0}
-                        >
-                          <span className="break-words px-1 text-center whitespace-normal leading-tight">{p.name}</span>
-                          {returnCount > 0 && (
-                            <div className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md">
-                              {returnCount}
-                            </div>
-                          )}
-                        </Button>
-                      );
-                    })}
+          {/* Existing order items */}
+          <div className="flex-1 overflow-y-auto px-4 pb-2">
+            <div className="flex flex-col gap-2">
+              {existingOrders.map((item) => {
+                const returnCount = returnItems.find((i) => i.productId === item.productId)?.amount || 0;
+                const remaining = item.amount - returnCount;
+                return (
+                  <div key={item.productId} className={`bg-zinc-900 border rounded-2xl p-4 flex items-center gap-3 transition-all ${returnCount > 0 ? "border-red-700/60 bg-red-950/20" : "border-zinc-800"}`}>
+                    <button
+                      onClick={() => addReturn(item)}
+                      disabled={remaining <= 0}
+                      className="flex-1 flex items-center gap-3 text-left disabled:opacity-40"
+                    >
+                      <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center shrink-0">
+                        <span className="font-black text-zinc-300">{remaining}</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">{item.name}</p>
+                        <p className="text-zinc-500 text-sm">{fmt(item.price)} / Stück</p>
+                      </div>
+                    </button>
+                    {returnCount > 0 && (
+                      <div className="flex items-center gap-1 bg-zinc-800 rounded-xl border border-red-800/40">
+                        <button onClick={() => changeReturn(item.productId, -1)} className="p-2 text-zinc-400 hover:text-red-400 active:scale-90 transition-all">
+                          {returnCount === 1 ? <Trash2 className="w-3.5 h-3.5 text-red-400" /> : <Minus className="w-3.5 h-3.5" />}
+                        </button>
+                        <span className="text-red-400 font-black text-sm w-5 text-center">{returnCount}</span>
+                        <button onClick={() => changeReturn(item.productId, 1)} disabled={returnCount >= item.amount} className="p-2 text-zinc-400 hover:text-white active:scale-90 transition-all disabled:opacity-30">
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          </div>
 
-                <div className="p-2 pt-0 shrink-0 flex gap-2 h-16 mt-2">
-                  <Button
-                    variant="outline"
-                    className="w-20 h-full rounded-2xl"
-                    onClick={() => { setReturnItems([]); setMode("menu"); }}
-                  >
-                    <ArrowLeft className="w-6 h-6" />
-                  </Button>
-                  <Button
-                    className={`flex-1 h-full rounded-2xl text-xl font-bold active:scale-95 transition-transform shadow-md ${returnItems.length > 0
-                      ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                      : "bg-muted-foreground"
-                      }`}
-                    onClick={saldo}
-                  >
-                    <CheckCircle2 className="mr-2 w-6 h-6" />
-                    {returnItems.length > 0 ? "SALDO" : "Schließen"}
-                  </Button>
-                </div>
+          {/* Confirm */}
+          <div className="shrink-0 p-4 bg-zinc-900 border-t border-zinc-800">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={returnItems.length === 0}
+                  className="w-full h-14 rounded-2xl text-base font-black bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white active:scale-[0.97] transition-all"
+                >
+                  <RefreshCcw className="w-5 h-5 mr-2" />
+                  {returnItems.length > 0 ? `Retoure buchen · ${fmt(returnTotal)}` : "Artikel auswählen"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="w-[90%] max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 text-white">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-white">Retoure bestätigen</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="text-zinc-400 mt-2">
+                      <p className="mb-2">Folgende Artikel werden zurückgebucht:</p>
+                      {returnItems.map((i) => (
+                        <div key={i.productId} className="flex justify-between text-sm text-red-300">
+                          <span>{i.amount}× {i.name}</span>
+                          <span>-{fmt(i.price * i.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex-row gap-2 mt-4">
+                  <AlertDialogCancel className="flex-1 mt-0 bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 rounded-xl">Abbrechen</AlertDialogCancel>
+                  <AlertDialogAction className="flex-1 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold" onClick={handleReturnConfirm}>
+                    Buchen
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
+
+      {/* ── HISTORY ───────────────────────────────────────────────────────────── */}
+      {mode === "history" && (
+        <div className="flex flex-col h-full">
+          <div className="flex items-center gap-3 px-4 pt-5 pb-4 shrink-0">
+            <button
+              onClick={() => setMode("home")}
+              className="bg-zinc-800 hover:bg-zinc-700 active:scale-95 transition-all rounded-xl p-2.5"
+            >
+              <ArrowLeft className="w-5 h-5 text-zinc-300" />
+            </button>
+            <div>
+              <h2 className="text-xl font-black text-white leading-none">Rechnungen</h2>
+              <p className="text-zinc-500 text-xs mt-0.5">Tisch {table} · Verlauf</p>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full text-zinc-500">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" /> Lade…
+              </div>
+            ) : historyOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-zinc-600 gap-3">
+                <Receipt className="w-10 h-10" />
+                <p className="text-sm font-medium">Noch keine Bestellungen</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {/* Open */}
+                {historyOrders.filter((o) => !o.payed).length > 0 && (
+                  <>
+                    <p className="text-zinc-500 text-xs font-semibold uppercase tracking-widest mb-1">Offen</p>
+                    {historyOrders.filter((o) => !o.payed).map((o, idx) => (
+                      <div key={`open-${idx}`} className="bg-amber-950/30 border border-amber-800/40 rounded-2xl px-4 py-3 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-white">{o.amount}× {o.name}</p>
+                          <p className="text-xs text-amber-500 font-semibold mt-0.5">Offen</p>
+                        </div>
+                        <span className="font-bold text-amber-400">{fmt(o.price * o.amount)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {/* Paid */}
+                {historyOrders.filter((o) => o.payed).length > 0 && (
+                  <>
+                    <p className="text-zinc-500 text-xs font-semibold uppercase tracking-widest mb-1 mt-3">Bezahlt</p>
+                    {historyOrders.filter((o) => o.payed).map((o, idx) => (
+                      <div key={`paid-${idx}`} className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 flex justify-between items-center opacity-60">
+                        <div>
+                          <p className="font-bold text-zinc-300">{o.amount}× {o.name}</p>
+                          <p className="text-xs text-green-500 font-semibold mt-0.5">Kassiert</p>
+                        </div>
+                        <span className="font-bold text-zinc-400">{fmt(o.price * o.amount)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
-
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Loading overlay */}
+      {isLoading && mode !== "home" && (
+        <div className="absolute inset-0 bg-zinc-950/70 flex items-center justify-center z-40 backdrop-blur-sm">
+          <div className="bg-zinc-900 rounded-2xl px-6 py-4 flex items-center gap-3 border border-zinc-700">
+            <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+            <span className="text-white font-semibold">Bitte warten…</span>
+          </div>
+        </div>
       )}
     </div>
   );

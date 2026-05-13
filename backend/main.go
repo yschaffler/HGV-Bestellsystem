@@ -212,7 +212,7 @@ func getAllOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	orders, err := getOpenOrdersForTable(id, DB)
+	orders, err := getAllOrdersForTable(id, DB)
 	data, err := json.Marshal(orders)
 	if err != nil {
 		log.Printf("error marshaling orders to json: %v", err)

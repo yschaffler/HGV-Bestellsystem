@@ -250,7 +250,7 @@ func payTableItems(table int, items []PayItem, db *sql.DB) error {
 func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 	for _, item := range items {
 		amountToReturn := item.Amount
-		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC;", table, item.Product)
+		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=true ORDER BY id ASC;", table, item.Product)
 		rows, err := db.Query(query)
 		if err != nil {
 			return err
