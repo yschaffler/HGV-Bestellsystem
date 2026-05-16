@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -28,7 +29,7 @@ func OpenDatabaseHandle() {
 	if !ok {
 		port = "3306"
 	}
-	dsn := fmt.Sprintf("root:%v@tcp(%v:%v)/bestellservice?charset=utf8mb4", password, host, port)
+	dsn := fmt.Sprintf("root:%v@tcp(%v:%v)/bestellservice?charset=utf8mb4&parseTime=true", password, host, port)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("error creating handle to database: %v", err)
@@ -290,6 +291,85 @@ func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 	return nil
 }
 
+func insertRechnung(req CreateRechnungRequest, db *sql.DB) error {
+	data, err := json.Marshal(req.Positionen)
+	if err != nil {
+		return fmt.Errorf("error marshaling rechnung positions: %v", err)
+	}
+	typ := req.Typ
+	if typ == "" {
+		typ = "RECHNUNG"
+	}
+	_, err = db.Exec(
+		"INSERT INTO rechnungen (tisch, typ, gesamt, positionen, kellner_id) VALUES (?, ?, ?, ?, ?)",
+		req.Tisch, typ, req.Gesamt, string(data), req.KellnerId,
+	)
+	return err
+}
+
+func getRechnungenForTable(table int, db *sql.DB) ([]Rechnung, error) {
+	rows, err := db.Query(
+		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE tisch=? ORDER BY erstellt_am DESC",
+		table,
+	)
+	if err != nil {
+		return []Rechnung{}, fmt.Errorf("error querying rechnungen: %v", err)
+	}
+	defer rows.Close()
+
+	var rechnungen []Rechnung
+	for rows.Next() {
+		var r Rechnung
+		var posJson string
+		if err := rows.Scan(&r.Id, &r.Tisch, &r.Typ, &r.ErstelltAm, &r.Gesamt, &posJson, &r.KellnerId); err != nil {
+			return []Rechnung{}, fmt.Errorf("error scanning rechnung: %v", err)
+		}
+		if err := json.Unmarshal([]byte(posJson), &r.Positionen); err != nil {
+			return []Rechnung{}, fmt.Errorf("error unmarshaling positions: %v", err)
+		}
+		rechnungen = append(rechnungen, r)
+	}
+	if rechnungen == nil {
+		rechnungen = []Rechnung{}
+	}
+	return rechnungen, nil
+}
+
+func getAllRechnungen(db *sql.DB) ([]Rechnung, error) {
+	rows, err := db.Query(
+		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen ORDER BY erstellt_am DESC",
+	)
+	if err != nil {
+		return []Rechnung{}, fmt.Errorf("error querying all rechnungen: %v", err)
+	}
+	defer rows.Close()
+
+	var rechnungen []Rechnung
+	for rows.Next() {
+		var r Rechnung
+		var posJson string
+		if err := rows.Scan(&r.Id, &r.Tisch, &r.Typ, &r.ErstelltAm, &r.Gesamt, &posJson, &r.KellnerId); err != nil {
+			return []Rechnung{}, fmt.Errorf("error scanning rechnung: %v", err)
+		}
+		if err := json.Unmarshal([]byte(posJson), &r.Positionen); err != nil {
+			return []Rechnung{}, fmt.Errorf("error unmarshaling positions: %v", err)
+		}
+		rechnungen = append(rechnungen, r)
+	}
+	if rechnungen == nil {
+		rechnungen = []Rechnung{}
+	}
+	return rechnungen, nil
+}
+
+func resetRechnungen(db *sql.DB) error {
+	if _, err := db.Exec("DELETE FROM `rechnungen`;"); err != nil {
+		return err
+	}
+	_, err := db.Exec("ALTER TABLE `rechnungen` AUTO_INCREMENT = 1;")
+	return err
+}
+
 func createUser(u User, db *sql.DB) error {
 	query := fmt.Sprintf("INSERT INTO `user` (`username`, `name`, `password`, `role`) VALUES (\"%v\", \"%v\", \"%v\", \"%v\");",
 		u.Username, u.Name, u.Password, u.Role)
@@ -366,7 +446,7 @@ func deleteUser(u User, db *sql.DB) error {
 }
 
 func resetOrders(db *sql.DB) error {
-	query := "DELETE * FROM `bestellungen`;"
+	query := "DELETE FROM `bestellungen`;"
 	_, err := db.Exec(query)
 	return err
 }

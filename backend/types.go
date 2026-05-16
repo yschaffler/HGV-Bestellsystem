@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 type Product struct {
 	Product_Id int     `json:"product_id"`
 	Price      float64 `json:"price"`
@@ -13,6 +15,7 @@ type Category struct {
 	Color       string `json:"category_color"`
 }
 
+// Order and PayRequest kept for backwards compatibility with the bar page
 type Order struct {
 	Id      int     `json:"order_id"`
 	Product int     `json:"order_product"`
@@ -32,11 +35,39 @@ type PayRequest struct {
 	Items []PayItem `json:"items"`
 }
 
+// RechnungPosition is a line item within a Rechnung
+type RechnungPosition struct {
+	ProductId int     `json:"product_id"`
+	Name      string  `json:"name"`
+	Amount    int     `json:"amount"`
+	Price     float64 `json:"price"`
+	Kategorie string  `json:"kategorie"`
+}
+
+// Rechnung represents a closed invoice or a cancellation (Storno)
+type Rechnung struct {
+	Id         int                `json:"rechnung_id"`
+	Tisch      int                `json:"rechnung_tisch"`
+	Typ        string             `json:"rechnung_typ"` // "RECHNUNG" or "STORNO"
+	ErstelltAm time.Time          `json:"rechnung_erstellt_am"`
+	Gesamt     float64            `json:"rechnung_gesamt"` // negative for STORNO
+	Positionen []RechnungPosition `json:"rechnung_positionen"`
+	KellnerId  string             `json:"rechnung_kellner_id"`
+}
+
+// CreateRechnungRequest is the POST body for /add/rechnung/
+type CreateRechnungRequest struct {
+	Tisch      int                `json:"tisch"`
+	Typ        string             `json:"typ"` // "RECHNUNG" or "STORNO"
+	Gesamt     float64            `json:"gesamt"`
+	Positionen []RechnungPosition `json:"positionen"`
+	KellnerId  string             `json:"kellner_id"`
+}
+
 type User struct {
 	Id       int    `json:"user_id"`
 	Username string `json:"user_username"`
-	Name string `json:"user_realname"`
-	//base-64 string des hashs passwort
+	Name     string `json:"user_realname"`
 	Password string `json:"user_password"`
 	Role     string `json:"user_role"`
 }

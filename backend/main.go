@@ -464,6 +464,95 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func requireAdmin(r *http.Request) bool {
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		return false
+	}
+	token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
+		return []byte("SECRET_KEY"), nil
+	})
+	if err != nil || !token.Valid {
+		return false
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return false
+	}
+	role, _ := claims["role"].(string)
+	return role == "ADMIN"
+}
+
+func createRechnungHandler(w http.ResponseWriter, r *http.Request) {
+	var req CreateRechnungRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("error decoding rechnung: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := insertRechnung(req, DB); err != nil {
+		log.Printf("error inserting rechnung: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func getRechnungenForTableHandler(w http.ResponseWriter, r *http.Request) {
+	idString := r.PathValue("id")
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	rechnungen, err := getRechnungenForTable(id, DB)
+	if err != nil {
+		log.Printf("error retrieving rechnungen: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(rechnungen)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func getAllRechnungenHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	rechnungen, err := getAllRechnungen(DB)
+	if err != nil {
+		log.Printf("error retrieving all rechnungen: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(rechnungen)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func resetRechnungenHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if err := resetRechnungen(DB); err != nil {
+		log.Printf("error resetting rechnungen: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func resetOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	if err := resetOrders(DB); err != nil {
 		log.Printf("error resetting the database: %v", err)
@@ -507,6 +596,12 @@ func main() {
 
 	router.HandleFunc("/pay/orders/", payOrdersHandler)
 	router.HandleFunc("/return/orders/", returnOrdersHandler)
+
+	router.HandleFunc("POST /add/rechnung/", createRechnungHandler)
+	router.HandleFunc("GET /get/rechnungen/table/{id}", getRechnungenForTableHandler)
+
+	router.HandleFunc("GET /admin/rechnungen/", getAllRechnungenHandler)
+	router.HandleFunc("POST /admin/reset/rechnungen/", resetRechnungenHandler)
 
 	router.HandleFunc("POST /login/", loginHandler)
 	router.HandleFunc("/me/", currentUser)

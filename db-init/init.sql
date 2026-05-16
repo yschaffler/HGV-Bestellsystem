@@ -16,15 +16,19 @@ CREATE TABLE IF NOT EXISTS `test_produkte` (
     FOREIGN KEY (`product_category`) REFERENCES `produkt_kategorien`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS `bestellungen` (
+-- Rechnungen: zentrale Tabelle für alle Buchungen (Kellner + Bar)
+-- typ: 'RECHNUNG' = normale Bestellung, 'STORNO' = Warenretoure (negative Beträge)
+-- tisch: Tischnummer (0 = Barkasse)
+CREATE TABLE IF NOT EXISTS `rechnungen` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `product` INT NOT NULL,
-    `amount` INT NOT NULL,
-    `price` FLOAT NOT NULL,
-    `payed` BOOLEAN NOT NULL,
-    `table` INT NOT NULL,
-    FOREIGN KEY (`product`) REFERENCES `test_produkte` (`id`) ON DELETE CASCADE
+    `tisch` INT NOT NULL,
+    `typ` VARCHAR(10) NOT NULL DEFAULT 'RECHNUNG',
+    `erstellt_am` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `gesamt` DECIMAL(10,2) NOT NULL,
+    `positionen` JSON NOT NULL,
+    `kellner_id` VARCHAR(50) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Migration for existing DBs: ALTER TABLE rechnungen ADD COLUMN kellner_id VARCHAR(50) NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS `user` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -35,17 +39,17 @@ CREATE TABLE IF NOT EXISTS `user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Initialen Admin-Nutzer anlegen (Passwort: admin)
-INSERT INTO `user` (`username`, `name`, `password`, `role`) VALUES 
+INSERT INTO `user` (`username`, `name`, `password`, `role`) VALUES
 ('admin', 'Administrator', 'jGl25bVBBBW96Qi9Te4V37Fnqchz/Eu4qB9vKrRIqRg=', 'ADMIN');
 
 -- Initiale Kategorien anlegen
-INSERT INTO `produkt_kategorien` (`name`, `color`) VALUES 
+INSERT INTO `produkt_kategorien` (`name`, `color`) VALUES
 ('Getränke', '#3b82f6'),
 ('Essen', '#ef4444'),
 ('Sonstiges', '#64748b');
 
 -- Initiale Produkte anlegen
-INSERT INTO `test_produkte` (`name`, `price`, `product_category`) VALUES 
+INSERT INTO `test_produkte` (`name`, `price`, `product_category`) VALUES
 ('Helles', 4.50, 1),
 ('Weißbier', 4.80, 1),
 ('Cola', 3.50, 1),

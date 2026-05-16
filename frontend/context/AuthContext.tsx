@@ -51,7 +51,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (!loading) {
-      const isProtected = pathname?.startsWith("/settings") || pathname?.startsWith("/kellner");
+      const isProtected =
+        pathname?.startsWith("/settings") ||
+        pathname?.startsWith("/kellner") ||
+        pathname?.startsWith("/admin");
 
       if (!user && isProtected) {
         if (pathname) {
@@ -60,7 +63,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         router.push("/login/");
       }
 
-      if (user && pathname?.startsWith("/settings") && user.role !== "ADMIN") {
+      const isAdminOnly = pathname?.startsWith("/settings") || pathname?.startsWith("/admin");
+      if (user && isAdminOnly && user.role !== "ADMIN") {
         router.push("/");
       }
 
@@ -78,12 +82,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  const isProtected = pathname?.startsWith("/settings") || pathname?.startsWith("/kellner");
+  const isProtected =
+    pathname?.startsWith("/settings") ||
+    pathname?.startsWith("/kellner") ||
+    pathname?.startsWith("/admin");
   if (!user && isProtected) {
     return null;
   }
 
-  if (user && pathname?.startsWith("/settings") && user.role !== "ADMIN") {
+  const isAdminOnly = pathname?.startsWith("/settings") || pathname?.startsWith("/admin");
+  if (user && isAdminOnly && user.role !== "ADMIN") {
     return null;
   }
 
