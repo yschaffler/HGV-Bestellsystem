@@ -15,6 +15,8 @@ import {
   Layers,
   Users,
   ChevronLeft,
+  BarChart3,
+  ChevronRight,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -268,7 +270,7 @@ export default function Settingspage() {
         </div>
 
         {error && (
-          <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center z-50 sticky top-[57px]">
+          <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center z-50 sticky top-14">
             {error}
           </div>
         )}
@@ -400,6 +402,21 @@ export default function Settingspage() {
               </CardContent>
             </Card>
             
+            {/* ── Statistiken ──────────────────────────────────────────────── */}
+            <button
+              onClick={() => router.push("/admin/statistiken")}
+              className="w-full flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-4 hover:bg-secondary/30 active:scale-[0.98] transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold text-foreground">Statistiken</p>
+                <p className="text-xs text-muted-foreground">Umsatz, Kellner, Kategorien & Event-Reset</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+
             {/* ── Users ───────────────────────────────────────────────────── */}
             <Card>
               <CardHeader className="pb-3">
