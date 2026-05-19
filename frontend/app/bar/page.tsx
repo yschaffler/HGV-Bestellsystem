@@ -119,36 +119,32 @@ export default function BarPage() {
     setPaymentError(null);
 
     try {
-      const results = await Promise.all(
-        cart.map((item) =>
-          fetch("/add/order/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              order_product: parseInt(item.id),
-              order_amount: item.amount,
-              order_price: item.price,
-              order_payed: true,
-              order_table: 0
-            }),
-          })
-        )
-      );
+      const res = await fetch("/add/rechnung/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tisch: 0,
+          kellner_id: "bar",
+          typ: "RECHNUNG",
+          gesamt: totalAmount,
+          positionen: cart.map((item) => ({
+            product_id: parseInt(item.id),
+            name: item.name,
+            amount: item.amount,
+            price: item.price,
+            kategorie: item.category,
+          })),
+        }),
+      });
 
-      // Prüfen ob alle Requests erfolgreich waren
-      const failed = results.some((r) => !r.ok);
-      if (failed) throw new Error("Server hat die Bestellung abgelehnt.");
-
+      if (!res.ok) throw new Error("Server hat die Bestellung abgelehnt.");
     } catch (err) {
       console.error("Fehler beim Speichern der Bestellung:", err);
       setPaymentError("Bestellung konnte nicht gespeichert werden. Bitte erneut versuchen.");
-      return; 
+      return;
     }
 
     setIsSuccess(true);
-
-    
-    // Simulate transaction saving & close
     setTimeout(() => {
       setIsSuccess(false);
       setIsCheckoutOpen(false);
@@ -306,10 +302,10 @@ export default function BarPage() {
                     `}
                     style={{ borderColor: product.categoryColor, backgroundColor: `${product.categoryColor}1A` }}
                   >
-                    <span className="font-bold text-xl md:text-2xl mb-1 text-center leading-tight text-black">
+                    <span className="font-bold text-xl md:text-2xl mb-1 text-center leading-tight text-foreground">
                       {product.name}
                     </span>
-                    <span className="font-semibold opacity-70 text-base text-black">
+                    <span className="font-semibold opacity-70 text-base text-foreground">
                       {product.price.toFixed(2)}€
                     </span>
 
