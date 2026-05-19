@@ -567,6 +567,24 @@ func resetOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func getLatestPDFStatisticsHandler(w http.ResponseWriter, r *http.Request) {
+	c, err := OrderByServerID()
+	if err != nil {
+		log.Printf("error creating the pdf: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	doc, err := c.Generate()
+	if err != nil {
+		log.Printf("error creating the pdf: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data := doc.GetBytes()
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Write(data)
+}
+
 func main() {
 	OpenDatabaseHandle()
 	router := http.NewServeMux()
@@ -578,6 +596,7 @@ func main() {
 	router.HandleFunc("/get/order/table/{id}", getOpenOrdersForTableHandler)
 	router.HandleFunc("/get/all-orders/table/{id}", getAllOrdersForTableHandler)
 	router.HandleFunc("/get/user/{id}", getUserByIdHandler)
+	router.HandleFunc("/get/statistics-pdf/", getLatestPDFStatisticsHandler)
 
 	router.HandleFunc("/add/product/", addProduct)
 	router.HandleFunc("/add/category/", addCategoryHandler)

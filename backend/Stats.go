@@ -9,9 +9,9 @@ import (
 )
 
 func OrderByServerID() (core.Maroto, error) {
-	arr, r := getAllRechnungen(DB)
-	if r != nil {
-		return nil, r
+	arr, err := getAllRechnungen(DB)
+	if err != nil {
+		return nil, err
 	}
 
 	m := maroto.New()
