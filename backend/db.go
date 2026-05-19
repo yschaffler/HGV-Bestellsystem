@@ -377,6 +377,24 @@ func createUser(u User, db *sql.DB) error {
 	return err
 }
 
+func getGesamt_KellnerIdFromRechnungnen(db *sql.DB) ([]Rechnung, error) {
+	query := "select `gesamt`,`kellner_id` from `rechnungen` order by `kellner_id`;"
+	var rechnungen []Rechnung
+	rows, err := db.Query(query)
+	if err != nil {
+		return []Rechnung{}, err
+	}
+	for rows.Next() {
+		var r Rechnung
+		err = rows.Scan(&r.Gesamt, &r.KellnerId)
+		if err != nil {
+			return []Rechnung{}, err
+		}
+		rechnungen = append(rechnungen, r)
+	}
+	return rechnungen, nil
+}
+
 func getUserById(id int, db *sql.DB) (User, error) {
 	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `role` FROM `user` WHERE `id`=%v;", id)
 	rows := db.QueryRow(query)
