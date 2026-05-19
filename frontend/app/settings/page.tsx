@@ -15,6 +15,7 @@ import {
   Layers,
   Users,
   ChevronLeft,
+  ChevronDown,
   BarChart3,
   ChevronRight,
 } from "lucide-react";
@@ -46,8 +47,13 @@ export default function Settingspage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState({ produkte: false, kategorien: false, nutzer: false });
 
   const router = useRouter()
+
+  function toggleCollapsed(key: keyof typeof collapsed) {
+    setCollapsed((c) => ({ ...c, [key]: !c[key] }));
+  }
 
   React.useEffect(() => {
     async function fetchInitialData() {
@@ -287,18 +293,24 @@ export default function Settingspage() {
 
             {/* ── Produkte ─────────────────────────────────────────────────────── */}
             <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    <UtensilsCrossed className="w-4 h-4" />
+              <button
+                onClick={() => toggleCollapsed("produkte")}
+                className="w-full text-left"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <UtensilsCrossed className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-base">Produkte</CardTitle>
+                      <CardDescription>{products.length} Artikel angelegt</CardDescription>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${collapsed.produkte ? "" : "rotate-180"}`} />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Produkte</CardTitle>
-                    <CardDescription>{products.length} Artikel angelegt</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+                </CardHeader>
+              </button>
+              {!collapsed.produkte && <CardContent className="flex flex-col gap-4">
 
                 <Tabs value={activeCategory} onValueChange={setActiveCategory}>
                   <TabsList className="flex flex-wrap h-auto gap-1 w-full">
@@ -353,23 +365,29 @@ export default function Settingspage() {
                     Produkt hinzufügen
                   </Button>
                 )}
-              </CardContent>
+              </CardContent>}
             </Card>
 
             {/* ── Kategorien ───────────────────────────────────────────────────── */}
             <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    <Layers className="w-4 h-4" />
+              <button
+                onClick={() => toggleCollapsed("kategorien")}
+                className="w-full text-left"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-base">Kategorien</CardTitle>
+                      <CardDescription>Produktgruppen verwalten</CardDescription>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${collapsed.kategorien ? "" : "rotate-180"}`} />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Kategorien</CardTitle>
-                    <CardDescription>Produktgruppen verwalten</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+                </CardHeader>
+              </button>
+              {!collapsed.kategorien && <CardContent className="flex flex-col gap-4">
 
                 <div>
                   {categories.map((catObj) => {
@@ -399,9 +417,9 @@ export default function Settingspage() {
                     Kategorie hinzufügen
                   </Button>
                 )}
-              </CardContent>
+              </CardContent>}
             </Card>
-            
+
             {/* ── Statistiken ──────────────────────────────────────────────── */}
             <button
               onClick={() => router.push("/admin/statistiken")}
@@ -419,18 +437,24 @@ export default function Settingspage() {
 
             {/* ── Users ───────────────────────────────────────────────────── */}
             <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    <Users className="w-4 h-4" />
+              <button
+                onClick={() => toggleCollapsed("nutzer")}
+                className="w-full text-left"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-base">Nutzer</CardTitle>
+                      <CardDescription>{users.length} Nutzer angelegt</CardDescription>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${collapsed.nutzer ? "" : "rotate-180"}`} />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Nutzer</CardTitle>
-                    <CardDescription>{users.length} Nutzer angelegt</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+                </CardHeader>
+              </button>
+              {!collapsed.nutzer && <CardContent className="flex flex-col gap-4">
                 <div>
                   {users.map(u => (
                     <UserRow key={u.id} user={u} onUpdate={updateUser} onRequestDelete={requestDeleteUser} />
@@ -443,7 +467,7 @@ export default function Settingspage() {
                     <PlusCircle className="w-4 h-4 mr-2" /> Nutzer hinzufügen
                   </Button>
                 )}
-              </CardContent>
+              </CardContent>}
             </Card>
 
           </div>
