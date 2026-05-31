@@ -404,7 +404,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		"username": u.Username,
 		"name":     u.Name,
 		"role":     u.Role,
-		"exp":      time.Now().Add(1 * time.Hour).Unix(),
+		"exp":      time.Now().Add(30 * 24 * time.Hour).Unix(),
 	})
 	tokenString, _ := token.SignedString([]byte("SECRET_KEY"))
 	http.SetCookie(w, &http.Cookie{
@@ -412,7 +412,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		Value:    tokenString,
 		HttpOnly: true,
 		Path:     "/",
-		MaxAge:   86400,
+		MaxAge:   30 * 24 * 60 * 60,
 	})
 	w.WriteHeader(http.StatusOK)
 }
