@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,7 +18,11 @@ import {
   ChevronDown,
   BarChart3,
   ChevronRight,
+  Printer,
+  Trash2,
 } from "lucide-react";
+import { fetchPrinterSettings, updatePrinterSettings, DEFAULT_SETTINGS } from "@/lib/printerSettings";
+import type { PrinterSettings, TablePrinterRule } from "@/lib/printerSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -47,12 +51,46 @@ export default function Settingspage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState({ produkte: false, kategorien: false, nutzer: false });
+  const [collapsed, setCollapsed] = useState({ produkte: false, kategorien: false, nutzer: false, drucker: false });
+
+  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
+  const [newRule, setNewRule] = useState<{ tableFrom: string; tableTo: string; barName: string }>({ tableFrom: "", tableTo: "", barName: "" });
+
+  useEffect(() => {
+    fetchPrinterSettings().then(setPrinterSettings);
+  }, []);
 
   const router = useRouter()
 
   function toggleCollapsed(key: keyof typeof collapsed) {
     setCollapsed((c) => ({ ...c, [key]: !c[key] }));
+  }
+
+  function updatePrinter(updated: PrinterSettings) {
+    setPrinterSettings(updated);
+    updatePrinterSettings(updated);
+  }
+
+  function togglePrintBarOrders() {
+    updatePrinter({ ...printerSettings, printBarOrders: !printerSettings.printBarOrders });
+  }
+
+  function addRule() {
+    const from = parseInt(newRule.tableFrom);
+    const to = parseInt(newRule.tableTo);
+    if (!newRule.barName.trim() || isNaN(from) || isNaN(to) || from > to) return;
+    const rule: TablePrinterRule = {
+      id: Date.now().toString(),
+      tableFrom: from,
+      tableTo: to,
+      barName: newRule.barName.trim(),
+    };
+    updatePrinter({ ...printerSettings, rules: [...printerSettings.rules, rule] });
+    setNewRule({ tableFrom: "", tableTo: "", barName: "" });
+  }
+
+  function deleteRule(id: string) {
+    updatePrinter({ ...printerSettings, rules: printerSettings.rules.filter(r => r.id !== id) });
   }
 
   React.useEffect(() => {
@@ -434,6 +472,114 @@ export default function Settingspage() {
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </button>
+
+            {/* ── Druckerkonfiguration ─────────────────────────────────────── */}
+            <Card>
+              <button onClick={() => toggleCollapsed("drucker")} className="w-full text-left">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <Printer className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-base">Druckerkonfiguration</CardTitle>
+                      <CardDescription>Bondrucker & Tischzuordnung</CardDescription>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${collapsed.drucker ? "" : "rotate-180"}`} />
+                  </div>
+                </CardHeader>
+              </button>
+              {!collapsed.drucker && (
+                <CardContent className="flex flex-col gap-5">
+
+                  {/* Toggle: Bar-Bestellungen drucken */}
+                  <div className="flex items-center justify-between gap-3 py-1">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Bar-Bestellungen drucken</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Bar-Bons werden an den zugeordneten Drucker gesendet</p>
+                    </div>
+                    <button
+                      onClick={togglePrintBarOrders}
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${printerSettings.printBarOrders ? "bg-primary" : "bg-muted"}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${printerSettings.printBarOrders ? "translate-x-6" : "translate-x-1"}`} />
+                    </button>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <p className="text-sm font-semibold text-foreground mb-1">Tischbereich → Drucker</p>
+                    <p className="text-xs text-muted-foreground mb-3">Kellner-Bestellungen werden immer gedruckt. Tischnummer bestimmt den Drucker.</p>
+
+                    {/* Existing rules */}
+                    <div className="flex flex-col gap-2 mb-3">
+                      {printerSettings.rules.length === 0 && (
+                        <p className="text-xs text-muted-foreground/60 text-center py-3">Keine Regeln angelegt</p>
+                      )}
+                      {printerSettings.rules.map((rule) => (
+                        <div key={rule.id} className="flex items-center gap-2 bg-muted/30 rounded-xl px-3 py-2.5 border">
+                          <span className="text-sm font-medium text-foreground flex-1">
+                            Tisch {rule.tableFrom}–{rule.tableTo}
+                          </span>
+                          <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded-lg">→ {rule.barName}</span>
+                          <button onClick={() => deleteRule(rule.id)} className="p-1 text-muted-foreground hover:text-destructive transition-colors ml-1">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add new rule */}
+                    <div className="flex flex-col gap-2 bg-muted/10 border border-dashed rounded-xl p-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Neue Regel</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Von Tisch</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={newRule.tableFrom}
+                            onChange={e => setNewRule(r => ({ ...r, tableFrom: e.target.value }))}
+                            placeholder="1"
+                            className="w-full rounded-lg border bg-background px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Bis Tisch</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={newRule.tableTo}
+                            onChange={e => setNewRule(r => ({ ...r, tableTo: e.target.value }))}
+                            placeholder="10"
+                            className="w-full rounded-lg border bg-background px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Bar-Name</label>
+                          <input
+                            type="text"
+                            value={newRule.barName}
+                            onChange={e => setNewRule(r => ({ ...r, barName: e.target.value }))}
+                            placeholder="Bar 1"
+                            className="w-full rounded-lg border bg-background px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-1"
+                        onClick={addRule}
+                        disabled={!newRule.tableFrom || !newRule.tableTo || !newRule.barName}
+                      >
+                        <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                        Regel hinzufügen
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
 
             {/* ── Users ───────────────────────────────────────────────────── */}
             <Card>

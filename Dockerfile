@@ -16,14 +16,10 @@ RUN npm run build
 FROM golang:alpine AS builder-backend
 
 WORKDIR /app/backend
-# Copy go.mod and go.sum files
-COPY backend/go.* ./
-RUN go mod download
-
-# Copy the backend source files
+# Copy all backend source files
 COPY backend/ ./
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o server .
+# Fetch dependencies (updates go.sum if needed) and build
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -o server .
 
 # Stage 3: Final Production Image
 FROM alpine:latest

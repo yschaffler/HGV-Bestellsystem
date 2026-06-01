@@ -38,6 +38,19 @@ CREATE TABLE IF NOT EXISTS `user` (
     `role` VARCHAR(15)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Druckereinstellungen (immer genau eine Zeile, id=1)
+CREATE TABLE IF NOT EXISTS `printer_settings` (
+    `id`           INT NOT NULL DEFAULT 1,
+    `settings_json` JSON NOT NULL,
+    `updated_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO `printer_settings` (`id`, `settings_json`) VALUES (
+    1,
+    '{"printBarOrders":true,"rules":[{"id":"1","tableFrom":1,"tableTo":99,"barName":"Bar 1"}]}'
+);
+
 -- Initialen Admin-Nutzer anlegen (Passwort: admin)
 INSERT INTO `user` (`username`, `name`, `password`, `role`) VALUES
 ('admin', 'Administrator', 'jGl25bVBBBW96Qi9Te4V37Fnqchz/Eu4qB9vKrRIqRg=', 'ADMIN');

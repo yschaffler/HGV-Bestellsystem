@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { fetchPrinterSettings, getBarNameForTable, DEFAULT_SETTINGS } from "@/lib/printerSettings";
+import type { PrinterSettings } from "@/lib/printerSettings";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -15,6 +17,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  MessageSquare,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -27,6 +30,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,10 +54,12 @@ type Product = {
 };
 
 type CartItem = {
+  id: string;
   productId: string;
   name: string;
   amount: number;
   price: number;
+  note: string;
 };
 
 type RechnungPosition = {
@@ -54,6 +68,7 @@ type RechnungPosition = {
   amount: number;
   price: number;
   kategorie: string;
+  note?: string;
 };
 
 type Rechnung = {
@@ -126,6 +141,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
   // Cart (ordering mode)
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartExpanded, setCartExpanded] = useState(true);
+  const [editingNoteItemId, setEditingNoteItemId] = useState<string | null>(null);
 
   // Rechnungen (invoices mode)
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
@@ -134,6 +150,9 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
   // Return (returning mode)
   const [returnableItems, setReturnableItems] = useState<ReturnableItem[]>([]);
   const [returnQueue, setReturnQueue] = useState<ReturnQueueItem[]>([]);
+
+  // Printer settings (loaded once on mount)
+  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -144,6 +163,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
 
   useEffect(() => {
     loadProductsAndCategories();
+    fetchPrinterSettings().then(setPrinterSettings);
   }, []);
 
   async function loadProductsAndCategories() {
@@ -251,17 +271,21 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
   function addToCart(product: Product) {
     if (navigator.vibrate) navigator.vibrate(12);
     setCart((prev) => {
-      const ex = prev.find((i) => i.productId === product.id);
-      if (ex) return prev.map((i) => (i.productId === product.id ? { ...i, amount: i.amount + 1 } : i));
-      return [...prev, { productId: product.id, name: product.name, amount: 1, price: product.price }];
+      const ex = prev.find((i) => i.productId === product.id && i.note.trim() === "");
+      if (ex) return prev.map((i) => (i.id === ex.id ? { ...i, amount: i.amount + 1 } : i));
+      return [...prev, { id: `${product.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`, productId: product.id, name: product.name, amount: 1, price: product.price, note: "" }];
     });
   }
 
-  function changeCart(productId: string, delta: number) {
+  function changeCart(cartItemId: string, delta: number) {
     if (navigator.vibrate) navigator.vibrate(10);
     setCart((prev) =>
-      prev.map((i) => (i.productId === productId ? { ...i, amount: i.amount + delta } : i)).filter((i) => i.amount > 0)
+      prev.map((i) => (i.id === cartItemId ? { ...i, amount: i.amount + delta } : i)).filter((i) => i.amount > 0)
     );
+  }
+
+  function updateCartNote(cartItemId: string, note: string) {
+    setCart((prev) => prev.map((i) => (i.id === cartItemId ? { ...i, note } : i)));
   }
 
   const cartTotal = cart.reduce((s, i) => s + i.price * i.amount, 0);
@@ -273,6 +297,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
     if (cart.length === 0) return;
     setIsSubmitting(true);
     try {
+      const barName = getBarNameForTable(table, printerSettings);
       await fetch("/add/rechnung/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -281,12 +306,14 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
           kellner_id: waiterId || "",
           typ: "RECHNUNG",
           gesamt: cartTotal,
+          bar_name: barName,
           positionen: cart.map((c) => ({
             product_id: parseInt(c.productId),
             name: c.name,
             amount: c.amount,
             price: c.price,
             kategorie: products.find((p) => p.id === c.productId)?.category || "",
+            note: c.note.trim(),
           })),
         }),
       });
@@ -331,6 +358,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
     if (returnQueue.length === 0) return;
     setIsSubmitting(true);
     try {
+      const barName = getBarNameForTable(table, printerSettings);
       await fetch("/add/rechnung/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -339,6 +367,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
           kellner_id: waiterId || "",
           typ: "STORNO",
           gesamt: -returnTotal,
+          bar_name: barName,
           positionen: returnQueue.map((r) => {
             const item = returnableItems.find((i) => i.productId === r.productId)!;
             return { product_id: parseInt(r.productId), name: item.name, amount: r.amount, price: item.price, kategorie: item.kategorie };
@@ -363,6 +392,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
 
   const invoiceRechnungen = rechnungen.filter((r) => r.rechnung_typ === "RECHNUNG");
   const stornoRechnungen = rechnungen.filter((r) => r.rechnung_typ === "STORNO");
+  const editingNoteItem = cart.find((item) => item.id === editingNoteItemId) || null;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -494,7 +524,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
             ) : (
               <div className="grid grid-cols-2 gap-3 pb-2">
                 {filteredProducts.map((p) => {
-                  const count = cart.find((i) => i.productId === p.id)?.amount || 0;
+                  const count = cart.filter((i) => i.productId === p.id).reduce((sum, i) => sum + i.amount, 0);
                   return (
                     <button
                       key={p.id}
@@ -540,30 +570,43 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
                   <div className="px-4 pb-2 max-h-44 overflow-y-auto">
                     <div className="flex flex-col gap-2">
                       {cart.map((item) => (
-                        <div key={item.productId} className="flex items-center gap-3">
-                          <div className="flex items-center bg-secondary/50 rounded-xl shrink-0">
+                        <div key={item.id} className="rounded-2xl border border-border bg-secondary/20 p-2">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center bg-secondary/50 rounded-xl shrink-0">
+                              <button
+                                onClick={() => changeCart(item.id, -1)}
+                                className="p-3 text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+                              >
+                                {item.amount === 1 ? (
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                ) : (
+                                  <Minus className="w-4 h-4" />
+                                )}
+                              </button>
+                              <span className="text-foreground font-bold text-sm w-6 text-center">{item.amount}</span>
+                              <button
+                                onClick={() => changeCart(item.id, 1)}
+                                className="p-3 text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
                             <button
-                              onClick={() => changeCart(item.productId, -1)}
-                              className="p-3 text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+                              type="button"
+                              onClick={() => setEditingNoteItemId(item.id)}
+                              className="min-w-0 flex-1 text-left active:opacity-70 transition-opacity"
                             >
-                              {item.amount === 1 ? (
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              ) : (
-                                <Minus className="w-4 h-4" />
+                              <span className="block truncate text-sm text-foreground/80 font-medium">{item.name}</span>
+                              {item.note.trim() && (
+                                <span className="mt-0.5 flex items-center gap-1 text-xs">
+                                  {"- " + item.note.trim()}
+                                </span>
                               )}
                             </button>
-                            <span className="text-foreground font-bold text-sm w-6 text-center">{item.amount}</span>
-                            <button
-                              onClick={() => changeCart(item.productId, 1)}
-                              className="p-3 text-muted-foreground hover:text-foreground active:scale-90 transition-all"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
+                            <span className="text-muted-foreground text-sm font-semibold shrink-0">
+                              {fmt(item.price * item.amount)}
+                            </span>
                           </div>
-                          <span className="flex-1 text-sm text-foreground/80 font-medium truncate">{item.name}</span>
-                          <span className="text-muted-foreground text-sm font-semibold shrink-0">
-                            {fmt(item.price * item.amount)}
-                          </span>
                         </div>
                       ))}
                     </div>
@@ -592,9 +635,14 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
                         <p className="text-3xl font-black text-foreground">{fmt(cartTotal)}</p>
                         <div className="mt-3 flex flex-col gap-1.5">
                           {cart.map((i) => (
-                            <div key={i.productId} className="flex justify-between text-sm">
+                            <div key={i.id} className="text-sm">
                               <span className="text-foreground/80">{i.amount}× {i.name}</span>
-                              <span className="text-muted-foreground">{fmt(i.price * i.amount)}</span>
+                              <span className="float-right text-muted-foreground">{fmt(i.price * i.amount)}</span>
+                              {i.note.trim() && (
+                                <span className="mt-0.5 block clear-both pl-3 text-xs text-muted-foreground">
+                                  - {i.note.trim()}
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -886,13 +934,18 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
                         <div className="border-t border-border px-4 pb-4 pt-3 bg-secondary/10">
                           <div className="flex flex-col gap-2">
                             {r.rechnung_positionen.map((pos, idx) => (
-                              <div key={idx} className="flex justify-between text-sm">
+                              <div key={idx} className="text-sm">
                                 <span className="text-foreground/80">
                                   {pos.amount}× {pos.name}
                                 </span>
-                                <span className="text-muted-foreground font-semibold">
+                                <span className="float-right text-muted-foreground font-semibold">
                                   {fmt(pos.price * pos.amount)}
                                 </span>
+                                {pos.note && (
+                                  <p className="mt-0.5 clear-both pl-3 text-xs text-muted-foreground">
+                                    Notiz: {pos.note}
+                                  </p>
+                                )}
                               </div>
                             ))}
                             <div className="flex justify-between text-sm font-black text-foreground border-t border-border pt-2 mt-1">
@@ -930,6 +983,49 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
           </div>
         </div>
       )}
+
+      <Dialog open={editingNoteItem !== null} onOpenChange={(open) => !open && setEditingNoteItemId(null)}>
+        <DialogContent className="w-[92%] max-w-sm rounded-2xl bg-card p-5 text-foreground" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Artikelnotiz</DialogTitle>
+            <DialogDescription>
+              {editingNoteItem ? `${editingNoteItem.amount}× ${editingNoteItem.name}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingNoteItem && (
+            <textarea
+              value={editingNoteItem.note}
+              onChange={(e) => updateCartNote(editingNoteItem.id, e.target.value)}
+              placeholder="z.B. ohne Eis, extra Zitrone"
+              rows={4}
+              autoFocus
+              className="w-full resize-none rounded-2xl border bg-background px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          )}
+
+          <DialogFooter className="-mx-5 -mb-5 flex-row gap-2">
+            {editingNoteItem?.note.trim() && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex-1 rounded-xl text-destructive hover:text-destructive"
+                onClick={() => {
+                  updateCartNote(editingNoteItem.id, "");
+                  setEditingNoteItemId(null);
+                }}
+              >
+                Löschen
+              </Button>
+            )}
+            <DialogClose asChild>
+              <Button type="button" className="flex-1 rounded-xl font-bold">
+                Fertig
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Submitting overlay */}
       {isSubmitting && (

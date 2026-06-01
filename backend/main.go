@@ -14,7 +14,11 @@ import (
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v5"
+
+	"bestellsystem_server/ws"
 )
+
+var PrintHub *ws.Hub
 
 func getProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := getAllProducts(DB)
@@ -483,6 +487,28 @@ func requireAdmin(r *http.Request) bool {
 	return role == "ADMIN"
 }
 
+func waiterNameForPrint(kellnerId string) string {
+	if kellnerId == "" {
+		return ""
+	}
+	if kellnerId == "bar" {
+		return "Bar"
+	}
+	id, err := strconv.Atoi(kellnerId)
+	if err != nil {
+		return kellnerId
+	}
+	u, err := getUserById(id, DB)
+	if err != nil {
+		log.Printf("error resolving waiter name for print job: %v", err)
+		return kellnerId
+	}
+	if u.Name != "" {
+		return u.Name
+	}
+	return u.Username
+}
+
 func createRechnungHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateRechnungRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -490,11 +516,37 @@ func createRechnungHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if err := insertRechnung(req, DB); err != nil {
+	id, err := insertRechnung(req, DB)
+	if err != nil {
 		log.Printf("error inserting rechnung: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	if req.BarName != "" {
+		items := make([]ws.OrderItem, len(req.Positionen))
+		for i, p := range req.Positionen {
+			items[i] = ws.OrderItem{
+				Name:     p.Name,
+				Quantity: p.Amount,
+				Price:    p.Price,
+				Note:     p.Note,
+			}
+		}
+		jobType := req.Typ
+		if jobType == "" {
+			jobType = "RECHNUNG"
+		}
+		PrintHub.EnqueueAndSend(req.BarName, &ws.PrintJob{
+			OrderID:    int(id),
+			JobType:    jobType,
+			Table:      req.Tisch,
+			WaiterName: waiterNameForPrint(req.KellnerId),
+			Items:      items,
+			Note:       req.Note,
+		})
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -553,6 +605,35 @@ func resetRechnungenHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func getPrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	raw, err := getPrinterSettings(DB)
+	if err != nil {
+		log.Printf("error getting printer settings: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write([]byte(raw))
+}
+
+func savePrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var buf json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&buf); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := savePrinterSettingsDB(DB, string(buf)); err != nil {
+		log.Printf("error saving printer settings: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func resetOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	if err := resetOrders(DB); err != nil {
 		log.Printf("error resetting the database: %v", err)
@@ -587,6 +668,7 @@ func getLatestPDFStatisticsHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	OpenDatabaseHandle()
+	PrintHub = ws.NewHub(os.Getenv("PRINTER_SECRET"))
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
 	router.HandleFunc("/get/all-categories/", getCategories)
@@ -621,6 +703,11 @@ func main() {
 
 	router.HandleFunc("GET /admin/rechnungen/", getAllRechnungenHandler)
 	router.HandleFunc("POST /admin/reset/rechnungen/", resetRechnungenHandler)
+
+	router.Handle("/ws/printer", PrintHub)
+
+	router.HandleFunc("GET /settings/printer/", getPrinterSettingsHandler)
+	router.HandleFunc("POST /settings/printer/", savePrinterSettingsHandler)
 
 	router.HandleFunc("POST /login/", loginHandler)
 	router.HandleFunc("/me/", currentUser)

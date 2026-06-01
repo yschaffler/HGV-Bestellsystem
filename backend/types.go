@@ -42,6 +42,7 @@ type RechnungPosition struct {
 	Amount    int     `json:"amount"`
 	Price     float64 `json:"price"`
 	Kategorie string  `json:"kategorie"`
+	Note      string  `json:"note,omitempty"`
 }
 
 // Rechnung represents a closed invoice or a cancellation (Storno)
@@ -62,6 +63,8 @@ type CreateRechnungRequest struct {
 	Gesamt     float64            `json:"gesamt"`
 	Positionen []RechnungPosition `json:"positionen"`
 	KellnerId  string             `json:"kellner_id"`
+	BarName    string             `json:"bar_name"`  // which printer queue to route to (e.g. "Bar 1")
+	Note       string             `json:"note"`      // optional legacy note printed on the receipt
 }
 
 type User struct {

@@ -291,20 +291,23 @@ func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 	return nil
 }
 
-func insertRechnung(req CreateRechnungRequest, db *sql.DB) error {
+func insertRechnung(req CreateRechnungRequest, db *sql.DB) (int64, error) {
 	data, err := json.Marshal(req.Positionen)
 	if err != nil {
-		return fmt.Errorf("error marshaling rechnung positions: %v", err)
+		return 0, fmt.Errorf("error marshaling rechnung positions: %v", err)
 	}
 	typ := req.Typ
 	if typ == "" {
 		typ = "RECHNUNG"
 	}
-	_, err = db.Exec(
+	result, err := db.Exec(
 		"INSERT INTO rechnungen (tisch, typ, gesamt, positionen, kellner_id) VALUES (?, ?, ?, ?, ?)",
 		req.Tisch, typ, req.Gesamt, string(data), req.KellnerId,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func getRechnungenForTable(table int, db *sql.DB) ([]Rechnung, error) {
@@ -460,6 +463,23 @@ func updateUserWithoutPassword(u User, db *sql.DB) error {
 func deleteUser(u User, db *sql.DB) error {
 	query := fmt.Sprintf("DELETE FROM `user` WHERE `id`=%v;", u.Id)
 	_, err := db.Exec(query)
+	return err
+}
+
+func getPrinterSettings(db *sql.DB) (string, error) {
+	var raw string
+	err := db.QueryRow("SELECT settings_json FROM printer_settings WHERE id=1").Scan(&raw)
+	if err == sql.ErrNoRows {
+		return `{"printBarOrders":true,"rules":[{"id":"1","tableFrom":1,"tableTo":99,"barName":"Bar 1"}]}`, nil
+	}
+	return raw, err
+}
+
+func savePrinterSettingsDB(db *sql.DB, raw string) error {
+	_, err := db.Exec(
+		"INSERT INTO printer_settings (id, settings_json) VALUES (1, ?) ON DUPLICATE KEY UPDATE settings_json=VALUES(settings_json)",
+		raw,
+	)
 	return err
 }
 

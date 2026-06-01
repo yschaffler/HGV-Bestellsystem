@@ -10,6 +10,7 @@ services:
       - BESTELLSERVICE_HOST=db
       - BESTELLSERVICE_PASSWORD=123
       - BESTELLSERVICE_PORT=3306
+      - PRINTER_SECRET=abiball2026
     depends_on:
       - db
     restart: always
