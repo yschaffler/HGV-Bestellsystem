@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchPrinterSettings, DEFAULT_SETTINGS } from "@/lib/printerSettings";
-import type { PrinterSettings } from "@/lib/printerSettings";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, Banknote, CreditCard, ChevronLeft, CheckCircle2, Delete, OctagonAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -34,7 +32,6 @@ export default function BarPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     async function loadData() {
@@ -72,7 +69,6 @@ export default function BarPage() {
       }
     }
     loadData();
-    fetchPrinterSettings().then(setPrinterSettings);
   }, []);
 
   // Checkout Modal State
@@ -131,7 +127,6 @@ export default function BarPage() {
           kellner_id: "bar",
           typ: "RECHNUNG",
           gesamt: totalAmount,
-          bar_name: printerSettings.printBarOrders ? "Bar 1" : "",
           positionen: cart.map((item) => ({
             product_id: parseInt(item.id),
             name: item.name,

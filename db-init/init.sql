@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS `printer_settings` (
 
 INSERT IGNORE INTO `printer_settings` (`id`, `settings_json`) VALUES (
     1,
-    '{"printBarOrders":true,"rules":[{"id":"1","tableFrom":1,"tableTo":99,"barName":"Bar 1"}]}'
+    '{"printBarOrders":true,"rules":[{"id":"1","barName":"Bar 1","tableFrom":null,"tableTo":null,"categories":[]}]}'
 );
 
 -- Initialen Admin-Nutzer anlegen (Passwort: admin)

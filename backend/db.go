@@ -493,13 +493,35 @@ func deleteUser(u User, db *sql.DB) error {
 	return err
 }
 
-func getPrinterSettings(db *sql.DB) (string, error) {
+func defaultPrinterSettings() PrinterSettingsConfig {
+	return PrinterSettingsConfig{
+		PrintBarOrders: true,
+		Rules: []PrinterRule{
+			{ID: "1", BarName: "Bar 1", Categories: []string{}},
+		},
+	}
+}
+
+func getPrinterSettings(db *sql.DB) (PrinterSettingsConfig, error) {
 	var raw string
 	err := db.QueryRow("SELECT settings_json FROM printer_settings WHERE id=1").Scan(&raw)
 	if err == sql.ErrNoRows {
-		return `{"printBarOrders":true,"rules":[{"id":"1","tableFrom":1,"tableTo":99,"barName":"Bar 1"}]}`, nil
+		return defaultPrinterSettings(), nil
 	}
-	return raw, err
+	if err != nil {
+		return defaultPrinterSettings(), err
+	}
+	var cfg PrinterSettingsConfig
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return defaultPrinterSettings(), err
+	}
+	// Ensure Categories slice is never nil
+	for i := range cfg.Rules {
+		if cfg.Rules[i].Categories == nil {
+			cfg.Rules[i].Categories = []string{}
+		}
+	}
+	return cfg, nil
 }
 
 func savePrinterSettingsDB(db *sql.DB, raw string) error {

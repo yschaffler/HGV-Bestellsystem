@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchPrinterSettings, getBarNameForTable, DEFAULT_SETTINGS } from "@/lib/printerSettings";
-import type { PrinterSettings } from "@/lib/printerSettings";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -151,8 +149,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
   const [returnableItems, setReturnableItems] = useState<ReturnableItem[]>([]);
   const [returnQueue, setReturnQueue] = useState<ReturnQueueItem[]>([]);
 
-  // Printer settings (loaded once on mount)
-  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -163,7 +159,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
 
   useEffect(() => {
     loadProductsAndCategories();
-    fetchPrinterSettings().then(setPrinterSettings);
   }, []);
 
   async function loadProductsAndCategories() {
@@ -297,7 +292,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
     if (cart.length === 0) return;
     setIsSubmitting(true);
     try {
-      const barName = getBarNameForTable(table, printerSettings);
       await fetch("/add/rechnung/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -306,7 +300,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
           kellner_id: waiterId || "",
           typ: "RECHNUNG",
           gesamt: cartTotal,
-          bar_name: barName,
           positionen: cart.map((c) => ({
             product_id: parseInt(c.productId),
             name: c.name,
@@ -358,7 +351,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
     if (returnQueue.length === 0) return;
     setIsSubmitting(true);
     try {
-      const barName = getBarNameForTable(table, printerSettings);
       await fetch("/add/rechnung/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -367,7 +359,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
           kellner_id: waiterId || "",
           typ: "STORNO",
           gesamt: -returnTotal,
-          bar_name: barName,
           positionen: returnQueue.map((r) => {
             const item = returnableItems.find((i) => i.productId === r.productId)!;
             return { product_id: parseInt(r.productId), name: item.name, amount: r.amount, price: item.price, kategorie: item.kategorie };

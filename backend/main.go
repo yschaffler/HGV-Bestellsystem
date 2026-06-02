@@ -487,6 +487,84 @@ func requireAdmin(r *http.Request) bool {
 	return role == "ADMIN"
 }
 
+// findPrinterForItem returns the first matching printer name for an item,
+// or "" if no rule matches.
+func findPrinterForItem(pos RechnungPosition, table int, settings PrinterSettingsConfig) string {
+	for _, rule := range settings.Rules {
+		if rule.TableFrom != nil && table < *rule.TableFrom {
+			continue
+		}
+		if rule.TableTo != nil && table > *rule.TableTo {
+			continue
+		}
+		if len(rule.Categories) > 0 {
+			matched := false
+			for _, cat := range rule.Categories {
+				if cat == pos.Kategorie {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		return rule.BarName
+	}
+	return ""
+}
+
+// routePrintJobs splits order items by printer and enqueues a PrintJob per printer.
+func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, orderID int64) {
+	// Bar orders (tisch=0) respect the printBarOrders toggle
+	if req.Tisch == 0 && !settings.PrintBarOrders {
+		return
+	}
+
+	jobType := req.Typ
+	if jobType == "" {
+		jobType = "RECHNUNG"
+	}
+	waiterName := waiterNameForPrint(req.KellnerId)
+
+	// Group items by target printer (preserving order)
+	type entry struct {
+		printer string
+		item    ws.OrderItem
+	}
+	grouped := make(map[string][]ws.OrderItem)
+	order := []string{}
+	seen := make(map[string]bool)
+
+	for _, pos := range req.Positionen {
+		printer := findPrinterForItem(pos, req.Tisch, settings)
+		if printer == "" {
+			continue
+		}
+		grouped[printer] = append(grouped[printer], ws.OrderItem{
+			Name:     pos.Name,
+			Quantity: pos.Amount,
+			Price:    pos.Price,
+			Note:     pos.Note,
+		})
+		if !seen[printer] {
+			order = append(order, printer)
+			seen[printer] = true
+		}
+	}
+
+	for _, printer := range order {
+		PrintHub.EnqueueAndSend(printer, &ws.PrintJob{
+			OrderID:    int(orderID),
+			JobType:    jobType,
+			Table:      req.Tisch,
+			WaiterName: waiterName,
+			Items:      grouped[printer],
+			Note:       req.Note,
+		})
+	}
+}
+
 func waiterNameForPrint(kellnerId string) string {
 	if kellnerId == "" {
 		return ""
@@ -523,28 +601,11 @@ func createRechnungHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.BarName != "" {
-		items := make([]ws.OrderItem, len(req.Positionen))
-		for i, p := range req.Positionen {
-			items[i] = ws.OrderItem{
-				Name:     p.Name,
-				Quantity: p.Amount,
-				Price:    p.Price,
-				Note:     p.Note,
-			}
-		}
-		jobType := req.Typ
-		if jobType == "" {
-			jobType = "RECHNUNG"
-		}
-		PrintHub.EnqueueAndSend(req.BarName, &ws.PrintJob{
-			OrderID:    int(id),
-			JobType:    jobType,
-			Table:      req.Tisch,
-			WaiterName: waiterNameForPrint(req.KellnerId),
-			Items:      items,
-			Note:       req.Note,
-		})
+	settings, settingsErr := getPrinterSettings(DB)
+	if settingsErr != nil {
+		log.Printf("error loading printer settings for routing: %v", settingsErr)
+	} else {
+		routePrintJobs(req, settings, id)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -606,14 +667,19 @@ func resetRechnungenHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getPrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
-	raw, err := getPrinterSettings(DB)
+	cfg, err := getPrinterSettings(DB)
 	if err != nil {
 		log.Printf("error getting printer settings: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write([]byte(raw))
+	w.Write(data)
 }
 
 func savePrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {

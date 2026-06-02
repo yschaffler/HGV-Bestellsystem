@@ -63,8 +63,24 @@ type CreateRechnungRequest struct {
 	Gesamt     float64            `json:"gesamt"`
 	Positionen []RechnungPosition `json:"positionen"`
 	KellnerId  string             `json:"kellner_id"`
-	BarName    string             `json:"bar_name"`  // which printer queue to route to (e.g. "Bar 1")
-	Note       string             `json:"note"`      // optional legacy note printed on the receipt
+	Note       string             `json:"note"`
+}
+
+// PrinterRule defines which printer receives an order item.
+// TableFrom/TableTo are optional (nil = no restriction).
+// Categories is optional (empty = all categories).
+type PrinterRule struct {
+	ID         string   `json:"id"`
+	BarName    string   `json:"barName"`
+	TableFrom  *int     `json:"tableFrom"`
+	TableTo    *int     `json:"tableTo"`
+	Categories []string `json:"categories"`
+}
+
+// PrinterSettingsConfig is the full printer configuration stored in the DB.
+type PrinterSettingsConfig struct {
+	PrintBarOrders bool          `json:"printBarOrders"`
+	Rules          []PrinterRule `json:"rules"`
 }
 
 type User struct {
