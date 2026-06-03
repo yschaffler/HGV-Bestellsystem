@@ -493,7 +493,7 @@ export default function Settingspage() {
             {/* ── Druckerkonfiguration ─────────────────────────────────────── */}
             <Card>
               <button onClick={() => toggleCollapsed("drucker")} className="w-full text-left">
-                <CardHeader className="pb-3">
+                <CardHeader>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                       <Printer className="w-4 h-4" />
@@ -508,7 +508,7 @@ export default function Settingspage() {
               </button>
 
               {!collapsed.drucker && (
-                <CardContent className="flex flex-col gap-5 pt-0">
+                <CardContent className="flex flex-col gap-5 pt-3">
 
                   {/* Toggle: Bar-Bestellungen drucken */}
                   <div className="flex items-center justify-between gap-3 py-1 border-b pb-4">
@@ -655,7 +655,7 @@ export default function Settingspage() {
                 onClick={() => toggleCollapsed("nutzer")}
                 className="w-full text-left"
               >
-                <CardHeader className="pb-3">
+                <CardHeader>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                       <Users className="w-4 h-4" />
@@ -668,7 +668,7 @@ export default function Settingspage() {
                   </div>
                 </CardHeader>
               </button>
-              {!collapsed.nutzer && <CardContent className="flex flex-col gap-4">
+              {!collapsed.nutzer && <CardContent className="flex flex-col gap-4 pt-3">
                 <div>
                   {users.map(u => (
                     <UserRow key={u.id} user={u} onUpdate={updateUser} onRequestDelete={requestDeleteUser} />
