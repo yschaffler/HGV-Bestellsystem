@@ -1,6 +1,6 @@
 # HGV Bestellsystem
 
-Kassen- und Bestellsystem für Veranstaltungen. Läuft als PWA auf Handys und Tablets, druckt Bons über WLAN-Drucker und liefert Echtzeit-Statistiken.
+Kassen- und Bestellsystem für Veranstaltungen. Läuft als PWA auf Handys und Tablets, druckt Bons über Bon-Drucker und liefert Statistiken über das Event.
 
 ## Screenshots
 
@@ -35,7 +35,7 @@ Kassen- und Bestellsystem für Veranstaltungen. Läuft als PWA auf Handys und Ta
 - **Druckerwarteschlangen** — Live-Übersicht im Adminbereich; Bons neu senden oder löschen
 - **Push-Benachrichtigungen** — Admins werden per PWA-Push alarmiert wenn ein Drucker offline ist
 - **Statistiken** — Umsatz, Kellnerauswertung, Tische, Kategorien; PDF-Export
-- **PWA** — installierbar auf iOS & Android, offline-fähig
+- **PWA** — installierbar auf iOS & Android
 
 ## Architektur
 
@@ -61,7 +61,7 @@ Kassen- und Bestellsystem für Veranstaltungen. Läuft als PWA auf Handys und Ta
 ┌────────────▼────────────────────┐
 │         Druckerclient           │
 │  → github.com/yschaffler/       │
-│    hgv-druckerclient            │
+│ HGV-Bestellsystem-Druckerclient │
 └─────────────────────────────────┘
 ```
 
@@ -70,7 +70,7 @@ Kassen- und Bestellsystem für Veranstaltungen. Läuft als PWA auf Handys und Ta
 ### Voraussetzungen
 
 - Docker & Docker Compose
-- Druckerclient auf dem Gerät mit dem WLAN-Drucker (siehe [hgv-druckerclient](https://github.com/yschaffler/hgv-druckerclient))
+- Druckerclient auf dem Gerät mit dem Bon-Drucker (siehe [HGV-Bestellsystem-Druckerclient](https://github.com/yschaffler/HGV-Bestellsystem-Druckerclient))
 
 ### Starten
 
@@ -92,19 +92,6 @@ Die App ist dann unter `http://<server-ip>:8000` erreichbar.
 | `BESTELLSERVICE_HOST` | MySQL Host (Standard: `db`) |
 | `BESTELLSERVICE_PORT` | MySQL Port (Standard: `3306`) |
 | `PRINTER_SECRET` | Gemeinsames Geheimnis für Druckerclient-Verbindung |
-
-## Druckerclient
-
-Der Druckerclient läuft auf dem Gerät das am Drucker hängt (z.B. Raspberry Pi) und verbindet sich per WebSocket mit dem Backend.
-
-**Repo:** [github.com/yschaffler/hgv-druckerclient](https://github.com/yschaffler/hgv-druckerclient)
-
-Verbindungsparameter für den Client:
-```
-ws://<server-ip>:8000/ws/printer?bar=<name>&secret=<PRINTER_SECRET>
-```
-
-`<name>` muss mit dem Druckernamen in den Einstellungen übereinstimmen (z.B. `Bar 1`, `Küche`).
 
 ## Standard-Login
 

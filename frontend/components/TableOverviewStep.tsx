@@ -418,7 +418,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
               </div>
               <div className="text-left">
                 <p className="text-xl font-black text-primary-foreground">Bestellen & Kassieren</p>
-                <p className="text-primary-foreground/50 text-sm mt-0.5">Sofortbezahlung · Rechnung wird erstellt</p>
+                <p className="text-primary-foreground/50 text-sm mt-0.5">Produkte auf einen Tisch bestellen</p>
               </div>
             </button>
 

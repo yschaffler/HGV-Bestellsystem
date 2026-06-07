@@ -354,7 +354,7 @@ export default function Settingspage() {
                 onClick={() => toggleCollapsed("produkte")}
                 className="w-full text-left"
               >
-                <CardHeader className="pb-3">
+                <CardHeader>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                       <UtensilsCrossed className="w-4 h-4" />
@@ -367,7 +367,7 @@ export default function Settingspage() {
                   </div>
                 </CardHeader>
               </button>
-              {!collapsed.produkte && <CardContent className="flex flex-col gap-4">
+              {!collapsed.produkte && <CardContent className="flex flex-col gap-4 pt-3">
 
                 <Tabs value={activeCategory} onValueChange={setActiveCategory}>
                   <TabsList className="flex flex-wrap h-auto gap-1 w-full">
