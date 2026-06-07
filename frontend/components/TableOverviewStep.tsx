@@ -617,19 +617,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
                     {cart.length > 0 ? `Kassieren · ${fmt(cartTotal)}` : "Artikel auswählen"}
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="
-                  fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0
-                  sm:relative sm:bottom-auto sm:left-auto sm:right-auto
-                  sm:top-auto sm:mx-auto sm:max-w-sm
-                  w-full rounded-t-3xl sm:rounded-2xl
-                  bg-card border border-border border-b-0 sm:border-b
-                  text-foreground p-0 gap-0
-                  max-h-[85dvh] flex flex-col
-                ">
-                  {/* Drag handle for mobile */}
-                  <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
-                    <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-                  </div>
+                <AlertDialogContent>
 
                   <AlertDialogHeader className="px-5 pt-4 pb-3 shrink-0">
                     <div className="flex items-start justify-between gap-3">
