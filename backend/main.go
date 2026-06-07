@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"log"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v5"
+	webpush "github.com/SherClockHolmes/webpush-go"
 
 	"bestellsystem_server/ws"
 )
@@ -732,9 +734,200 @@ func getLatestPDFStatisticsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// ─── VAPID key management ────────────────────────────────────────────────────
+
+var vapidPublicKey string
+var vapidPrivateKey string
+
+func initVAPIDKeys() {
+	pub, err := getAppConfig(DB, "vapid_public")
+	if err == sql.ErrNoRows || pub == "" {
+		privKey, pubKey, err := webpush.GenerateVAPIDKeys()
+		if err != nil {
+			log.Fatalf("failed to generate VAPID keys: %v", err)
+		}
+		_ = setAppConfig(DB, "vapid_public", pubKey)
+		_ = setAppConfig(DB, "vapid_private", privKey)
+		vapidPublicKey = pubKey
+		vapidPrivateKey = privKey
+		log.Printf("VAPID keys generated")
+		return
+	}
+	if err != nil {
+		log.Fatalf("failed to load VAPID public key: %v", err)
+	}
+	priv, err := getAppConfig(DB, "vapid_private")
+	if err != nil {
+		log.Fatalf("failed to load VAPID private key: %v", err)
+	}
+	vapidPublicKey = pub
+	vapidPrivateKey = priv
+}
+
+func sendPushToAll(title, body string) {
+	subs, err := getAllPushSubscriptions(DB)
+	if err != nil {
+		log.Printf("push: could not load subscriptions: %v", err)
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{"title": title, "body": body})
+	for _, sub := range subs {
+		s := &webpush.Subscription{
+			Endpoint: sub.Endpoint,
+			Keys: webpush.Keys{
+				P256dh: sub.P256DH,
+				Auth:   sub.Auth,
+			},
+		}
+		resp, err := webpush.SendNotification(payload, s, &webpush.Options{
+			VAPIDPublicKey:  vapidPublicKey,
+			VAPIDPrivateKey: vapidPrivateKey,
+			Subscriber:      "mailto:admin@hgv-bestellsystem.local",
+			TTL:             60,
+		})
+		if err != nil {
+			log.Printf("push send error: %v", err)
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == 410 || resp.StatusCode == 404 {
+			_ = deletePushSubscription(DB, sub.Endpoint)
+		}
+	}
+}
+
+// staleDetectionLoop checks every minute for printer queues with jobs that are
+// stuck (client disconnected, jobs older than 3 minutes) and sends push alerts.
+func staleDetectionLoop() {
+	const checkInterval = time.Minute
+	const staleThreshold = 3 * time.Minute
+	alerted := make(map[string]bool)
+
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		stale := PrintHub.StaleQueues(staleThreshold)
+		nowAlerted := make(map[string]bool)
+		for _, info := range stale {
+			nowAlerted[info.Bar] = true
+			if !alerted[info.Bar] {
+				log.Printf("stale queue alert: bar=%q jobs=%d", info.Bar, len(info.Jobs))
+				go sendPushToAll(
+					"⚠️ Drucker nicht verbunden",
+					info.Bar+" hat "+strconv.Itoa(len(info.Jobs))+" Bon(s) in der Warteschlange – Druckerclient prüfen!",
+				)
+			}
+		}
+		alerted = nowAlerted
+	}
+}
+
+// ─── Printer queue API ───────────────────────────────────────────────────────
+
+func getPrinterQueuesHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	status := PrintHub.GetAllQueueStatus()
+	if status == nil {
+		status = []ws.QueueInfo{}
+	}
+	data, _ := json.Marshal(status)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func deletePrinterJobHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Bar     string `json:"bar"`
+		OrderID int    `json:"order_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Bar == "" || req.OrderID == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if PrintHub.DeleteJob(req.Bar, req.OrderID) {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func resendPrinterJobHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Bar     string `json:"bar"`
+		OrderID int    `json:"order_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Bar == "" || req.OrderID == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if PrintHub.ResendJob(req.Bar, req.OrderID) {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+// ─── Push notification API ───────────────────────────────────────────────────
+
+func getVAPIDPublicKeyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	data, _ := json.Marshal(map[string]string{"publicKey": vapidPublicKey})
+	w.Write(data)
+}
+
+func subscribePushHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var sub PushSubscription
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil || sub.Endpoint == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := savePushSubscription(DB, sub); err != nil {
+		log.Printf("error saving push subscription: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func unsubscribePushHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Endpoint string `json:"endpoint"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Endpoint == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	_ = deletePushSubscription(DB, req.Endpoint)
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
+	if err := ensurePushTables(DB); err != nil {
+		log.Fatalf("failed to create push tables: %v", err)
+	}
+	initVAPIDKeys()
 	PrintHub = ws.NewHub(os.Getenv("PRINTER_SECRET"))
+	go staleDetectionLoop()
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
 	router.HandleFunc("/get/all-categories/", getCategories)
@@ -774,6 +967,14 @@ func main() {
 
 	router.HandleFunc("GET /settings/printer/", getPrinterSettingsHandler)
 	router.HandleFunc("POST /settings/printer/", savePrinterSettingsHandler)
+
+	router.HandleFunc("GET /admin/printer/queues/", getPrinterQueuesHandler)
+	router.HandleFunc("POST /admin/printer/queues/delete/", deletePrinterJobHandler)
+	router.HandleFunc("POST /admin/printer/queues/resend/", resendPrinterJobHandler)
+
+	router.HandleFunc("GET /push/vapid-public-key/", getVAPIDPublicKeyHandler)
+	router.HandleFunc("POST /push/subscribe/", subscribePushHandler)
+	router.HandleFunc("POST /push/unsubscribe/", unsubscribePushHandler)
 
 	router.HandleFunc("POST /login/", loginHandler)
 	router.HandleFunc("/me/", currentUser)
