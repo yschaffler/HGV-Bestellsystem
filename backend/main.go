@@ -807,6 +807,9 @@ func sendPushToAll(title, body string) {
 			log.Printf("push[%d]: subscription expired, removing from DB", i)
 			_ = deletePushSubscription(DB, sub.Endpoint)
 		}
+		if resp.StatusCode == 403 {
+			log.Printf("push[%d]: VAPID public key in use: %.20s... — browser subscription may use a different key; client must re-subscribe", i, vapidPublicKey)
+		}
 	}
 }
 

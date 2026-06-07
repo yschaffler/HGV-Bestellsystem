@@ -66,17 +66,51 @@ export function PrinterQueueMonitor() {
     return () => clearInterval(id);
   }, [fetchQueues]);
 
-  // Check current push subscription state
+  // Check current push subscription state — also validates that the stored
+  // subscription uses the same VAPID key as the server. If not, unsubscribe
+  // and prompt the user to re-subscribe (prevents BadJwtToken 403 errors).
   useEffect(() => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       setPushState("unsupported");
       return;
     }
-    navigator.serviceWorker.ready.then((reg) =>
-      reg.pushManager.getSubscription().then((sub) => {
-        setPushState(sub ? "subscribed" : "idle");
-      })
-    );
+    async function checkSubscription() {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        setPushState("idle");
+        return;
+      }
+      // Verify the key matches the server's current VAPID key
+      try {
+        const keyRes = await fetch("/push/vapid-public-key/");
+        const { publicKey } = await keyRes.json();
+        const serverKeyBytes = urlBase64ToUint8Array(publicKey);
+        const subKeyBytes = sub.options.applicationServerKey;
+        // Compare byte-by-byte
+        const serverArr = new Uint8Array(serverKeyBytes);
+        const subArr = subKeyBytes ? new Uint8Array(subKeyBytes as ArrayBuffer) : null;
+        const keysMatch = subArr &&
+          serverArr.length === subArr.length &&
+          serverArr.every((b, i) => b === subArr[i]);
+        if (!keysMatch) {
+          // VAPID key changed (e.g. server restarted without persistent DB) — force re-subscribe
+          await sub.unsubscribe();
+          await fetch("/push/unsubscribe/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          setPushState("idle");
+          setActionMsg("Push-Schlüssel hat sich geändert — bitte erneut aktivieren.");
+          return;
+        }
+      } catch {
+        // If we can't verify, assume it's fine
+      }
+      setPushState("subscribed");
+    }
+    checkSubscription();
   }, []);
 
   async function subscribePush() {
