@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Printer,
   Trash2,
+  Activity,
 } from "lucide-react";
 import { fetchPrinterSettings, updatePrinterSettings, DEFAULT_SETTINGS } from "@/lib/printerSettings";
 import type { PrinterSettings, PrinterRule } from "@/lib/printerSettings";
@@ -34,6 +35,7 @@ import { CategoryRow } from "@/components/settings/CategoryRow";
 import { UserForm } from "@/components/settings/UserForm";
 import { UserRow } from "@/components/settings/UserRow";
 import { DeleteConfirmDialog } from "@/components/settings/DeleteConfirmDialog";
+import { PrinterQueueMonitor } from "@/components/settings/PrinterQueueMonitor";
 import { useRouter } from "next/navigation";
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -51,7 +53,7 @@ export default function Settingspage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState({ produkte: true, kategorien: true, nutzer: true, drucker: true });
+  const [collapsed, setCollapsed] = useState({ produkte: true, kategorien: true, nutzer: true, drucker: true, queues: true });
 
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
   const [newRule, setNewRule] = useState<{ barName: string; tableFrom: string; tableTo: string; categories: string[] }>(
@@ -645,6 +647,29 @@ export default function Settingspage() {
                   <p className="text-xs text-muted-foreground/70 leading-relaxed">
                     <span className="font-semibold">Tipp:</span> Regeln werden von oben nach unten geprüft — erste Übereinstimmung gewinnt pro Artikel. Artikel ohne passende Regel werden nicht gedruckt. Kombination aus Tisch <em>und</em> Kategorie ist möglich.
                   </p>
+                </CardContent>
+              )}
+            </Card>
+
+            {/* ── Druckerwarteschlangen ────────────────────────────────────── */}
+            <Card>
+              <button onClick={() => toggleCollapsed("queues")} className="w-full text-left">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <Activity className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-base">Druckerwarteschlangen</CardTitle>
+                      <CardDescription>Bon-Queue überwachen, neu drucken & löschen</CardDescription>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${collapsed.queues ? "" : "rotate-180"}`} />
+                  </div>
+                </CardHeader>
+              </button>
+              {!collapsed.queues && (
+                <CardContent className="pt-0">
+                  <PrinterQueueMonitor />
                 </CardContent>
               )}
             </Card>

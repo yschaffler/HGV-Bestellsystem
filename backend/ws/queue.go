@@ -1,6 +1,9 @@
 package ws
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type OrderItem struct {
 	Name     string  `json:"name"`
@@ -16,6 +19,7 @@ type PrintJob struct {
 	WaiterName string      `json:"waiter_name,omitempty"`
 	Items      []OrderItem `json:"items"`
 	Note       string      `json:"note,omitempty"`
+	EnqueuedAt time.Time   `json:"enqueued_at"`
 }
 
 type printQueue struct {
@@ -34,6 +38,9 @@ func (q *printQueue) Add(job *PrintJob) {
 	if job.OrderID == 0 {
 		job.OrderID = q.nextID
 		q.nextID++
+	}
+	if job.EnqueuedAt.IsZero() {
+		job.EnqueuedAt = time.Now()
 	}
 	q.pending = append(q.pending, job)
 }
@@ -55,4 +62,27 @@ func (q *printQueue) Ack(orderID int) {
 			return
 		}
 	}
+}
+
+func (q *printQueue) Delete(orderID int) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for i, job := range q.pending {
+		if job.OrderID == orderID {
+			q.pending = append(q.pending[:i], q.pending[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (q *printQueue) Find(orderID int) *PrintJob {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, job := range q.pending {
+		if job.OrderID == orderID {
+			return job
+		}
+	}
+	return nil
 }
