@@ -750,7 +750,7 @@ func initVAPIDKeys() {
 		_ = setAppConfig(DB, "vapid_private", privKey)
 		vapidPublicKey = pubKey
 		vapidPrivateKey = privKey
-		log.Printf("VAPID keys generated")
+		log.Printf("push: VAPID keys generated (public key: %.20s...)", pubKey)
 		return
 	}
 	if err != nil {
@@ -762,6 +762,7 @@ func initVAPIDKeys() {
 	}
 	vapidPublicKey = pub
 	vapidPrivateKey = priv
+	log.Printf("push: VAPID keys loaded from DB (public key: %.20s...)", pub)
 }
 
 func sendPushToAll(title, body string) {
@@ -770,8 +771,13 @@ func sendPushToAll(title, body string) {
 		log.Printf("push: could not load subscriptions: %v", err)
 		return
 	}
+	if len(subs) == 0 {
+		log.Printf("push: no subscriptions registered — skipping send (title: %q)", title)
+		return
+	}
+	log.Printf("push: sending to %d subscriber(s) — %q", len(subs), title)
 	payload, _ := json.Marshal(map[string]string{"title": title, "body": body})
-	for _, sub := range subs {
+	for i, sub := range subs {
 		s := &webpush.Subscription{
 			Endpoint: sub.Endpoint,
 			Keys: webpush.Keys{
@@ -786,11 +792,19 @@ func sendPushToAll(title, body string) {
 			TTL:             60,
 		})
 		if err != nil {
-			log.Printf("push send error: %v", err)
+			log.Printf("push[%d]: send error (endpoint: %.50s...): %v", i, sub.Endpoint, err)
 			continue
 		}
+		respBody := make([]byte, 512)
+		n, _ := resp.Body.Read(respBody)
 		resp.Body.Close()
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			log.Printf("push[%d]: delivered — HTTP %d (endpoint: %.50s...)", i, resp.StatusCode, sub.Endpoint)
+		} else {
+			log.Printf("push[%d]: failed — HTTP %d body: %s (endpoint: %.50s...)", i, resp.StatusCode, string(respBody[:n]), sub.Endpoint)
+		}
 		if resp.StatusCode == 410 || resp.StatusCode == 404 {
+			log.Printf("push[%d]: subscription expired, removing from DB", i)
 			_ = deletePushSubscription(DB, sub.Endpoint)
 		}
 	}
@@ -893,14 +907,16 @@ func subscribePushHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var sub PushSubscription
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil || sub.Endpoint == "" {
+		log.Printf("push subscribe: bad request: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if err := savePushSubscription(DB, sub); err != nil {
-		log.Printf("error saving push subscription: %v", err)
+		log.Printf("push subscribe: error saving subscription: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	log.Printf("push subscribe: new subscription saved (endpoint: %.60s...)", sub.Endpoint)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -917,6 +933,7 @@ func unsubscribePushHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = deletePushSubscription(DB, req.Endpoint)
+	log.Printf("push unsubscribe: removed (endpoint: %.60s...)", req.Endpoint)
 	w.WriteHeader(http.StatusOK)
 }
 
