@@ -698,7 +698,7 @@ export default function StatistikPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="flex flex-col gap-2 pt-0">
+          <CardContent className="flex flex-col gap-2 pt-0 overflow-y-auto max-h-130">
             {filteredRechnungen.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-8 opacity-50">
                 Keine Rechnungen gefunden
