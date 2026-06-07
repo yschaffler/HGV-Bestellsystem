@@ -788,7 +788,7 @@ func sendPushToAll(title, body string) {
 		resp, err := webpush.SendNotification(payload, s, &webpush.Options{
 			VAPIDPublicKey:  vapidPublicKey,
 			VAPIDPrivateKey: vapidPrivateKey,
-			Subscriber:      "mailto:admin@hgv-bestellsystem.local",
+			Subscriber:      "https://github.com/yschaffler/HGV-Bestellsystem",
 			TTL:             60,
 		})
 		if err != nil {
