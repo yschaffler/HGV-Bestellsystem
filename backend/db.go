@@ -365,6 +365,33 @@ func getAllRechnungen(db *sql.DB) ([]Rechnung, error) {
 	return rechnungen, nil
 }
 
+func getAllNonStornoRechnungen(db *sql.DB) ([]Rechnung, error) {
+	rows, err := db.Query(
+		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE typ!='STORNO' ORDER BY erstellt_am DESC",
+	)
+	if err != nil {
+		return []Rechnung{}, fmt.Errorf("error querying stornos: %v", err)
+	}
+	defer rows.Close()
+
+	var rechnungen []Rechnung
+	for rows.Next() {
+		var r Rechnung
+		var posJson string
+		if err := rows.Scan(&r.Id, &r.Tisch, &r.Typ, &r.ErstelltAm, &r.Gesamt, &posJson, &r.KellnerId); err != nil {
+			return []Rechnung{}, fmt.Errorf("error scanning rechnung: %v", err)
+		}
+		if err := json.Unmarshal([]byte(posJson), &r.Positionen); err != nil {
+			return []Rechnung{}, fmt.Errorf("error unmarshaling positions: %v", err)
+		}
+		rechnungen = append(rechnungen, r)
+	}
+	if rechnungen == nil {
+		rechnungen = []Rechnung{}
+	}
+	return rechnungen, nil
+}
+
 func getAllStornos(db *sql.DB) ([]Rechnung, error) {
 	rows, err := db.Query(
 		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE typ='STORNO' ORDER BY erstellt_am DESC",

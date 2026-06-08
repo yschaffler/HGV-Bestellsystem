@@ -649,7 +649,7 @@ func resetOrdersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getLatestPDFStatisticsHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := OrderByServerID()
+	c, err := getStatsForPDF()
 	if err != nil {
 		log.Printf("error creating the pdf: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
