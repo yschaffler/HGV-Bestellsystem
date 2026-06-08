@@ -72,6 +72,5 @@ func OrderByServerID() (core.Maroto, error) {
 			text.NewCol(4, fmt.Sprintf("%v", value)),
 		)
 	}
-
 	return m, nil
 }
