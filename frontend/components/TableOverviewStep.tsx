@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchPrinterSettings, getBarNameForTable, DEFAULT_SETTINGS } from "@/lib/printerSettings";
-import type { PrinterSettings } from "@/lib/printerSettings";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -151,8 +149,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
   const [returnableItems, setReturnableItems] = useState<ReturnableItem[]>([]);
   const [returnQueue, setReturnQueue] = useState<ReturnQueueItem[]>([]);
 
-  // Printer settings (loaded once on mount)
-  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -163,7 +159,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
 
   useEffect(() => {
     loadProductsAndCategories();
-    fetchPrinterSettings().then(setPrinterSettings);
   }, []);
 
   async function loadProductsAndCategories() {
@@ -297,7 +292,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
     if (cart.length === 0) return;
     setIsSubmitting(true);
     try {
-      const barName = getBarNameForTable(table, printerSettings);
       await fetch("/add/rechnung/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -306,7 +300,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
           kellner_id: waiterId || "",
           typ: "RECHNUNG",
           gesamt: cartTotal,
-          bar_name: barName,
           positionen: cart.map((c) => ({
             product_id: parseInt(c.productId),
             name: c.name,
@@ -358,7 +351,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
     if (returnQueue.length === 0) return;
     setIsSubmitting(true);
     try {
-      const barName = getBarNameForTable(table, printerSettings);
       await fetch("/add/rechnung/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -367,7 +359,6 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
           kellner_id: waiterId || "",
           typ: "STORNO",
           gesamt: -returnTotal,
-          bar_name: barName,
           positionen: returnQueue.map((r) => {
             const item = returnableItems.find((i) => i.productId === r.productId)!;
             return { product_id: parseInt(r.productId), name: item.name, amount: r.amount, price: item.price, kategorie: item.kategorie };
@@ -427,7 +418,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
               </div>
               <div className="text-left">
                 <p className="text-xl font-black text-primary-foreground">Bestellen & Kassieren</p>
-                <p className="text-primary-foreground/50 text-sm mt-0.5">Sofortbezahlung · Rechnung wird erstellt</p>
+                <p className="text-primary-foreground/50 text-sm mt-0.5">Produkte auf einen Tisch bestellen</p>
               </div>
             </button>
 
@@ -626,35 +617,56 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
                     {cart.length > 0 ? `Kassieren · ${fmt(cartTotal)}` : "Artikel auswählen"}
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="w-[90%] max-w-sm rounded-2xl bg-card border border-border text-foreground">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Bestellung bestätigen</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                      <div className="text-muted-foreground mt-2">
-                        <p className="mb-3">Gesamtbetrag:</p>
-                        <p className="text-3xl font-black text-foreground">{fmt(cartTotal)}</p>
-                        <div className="mt-3 flex flex-col gap-1.5">
-                          {cart.map((i) => (
-                            <div key={i.id} className="text-sm">
-                              <span className="text-foreground/80">{i.amount}× {i.name}</span>
-                              <span className="float-right text-muted-foreground">{fmt(i.price * i.amount)}</span>
+                <AlertDialogContent>
+
+                  <AlertDialogHeader className="px-5 pt-4 pb-3 shrink-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <AlertDialogTitle className="text-xl font-black leading-tight">
+                          Bestellung bestätigen
+                        </AlertDialogTitle>
+                        <p className="text-sm text-muted-foreground mt-0.5">Tisch {table}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Gesamt</p>
+                        <p className="text-3xl font-black text-foreground leading-none mt-0.5">{fmt(cartTotal)}</p>
+                      </div>
+                    </div>
+                  </AlertDialogHeader>
+
+                  <div className="mx-4 mb-3 h-px bg-border shrink-0" />
+
+                  {/* Scrollable item list */}
+                  <AlertDialogDescription asChild>
+                    <div className="flex-1 overflow-y-auto px-5 pb-2 min-h-0">
+                      <div className="flex flex-col gap-0.5">
+                        {cart.map((i) => (
+                          <div key={i.id} className="flex items-start justify-between gap-3 py-1.5">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium text-foreground/90 leading-snug">
+                                <span className="text-primary font-bold">{i.amount}×</span> {i.name}
+                              </span>
                               {i.note.trim() && (
-                                <span className="mt-0.5 block clear-both pl-3 text-xs text-muted-foreground">
-                                  - {i.note.trim()}
-                                </span>
+                                <p className="text-xs text-muted-foreground mt-0.5 pl-4">– {i.note.trim()}</p>
                               )}
                             </div>
-                          ))}
-                        </div>
+                            <span className="text-sm font-semibold text-muted-foreground shrink-0 tabular-nums">
+                              {fmt(i.price * i.amount)}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="flex-row gap-2 mt-4">
-                    <AlertDialogCancel className="flex-1 mt-0 bg-secondary border-border text-muted-foreground hover:bg-secondary/80 rounded-xl">
+                    </div>
+                  </AlertDialogDescription>
+
+                  <div className="mx-4 mt-2 h-px bg-border shrink-0" />
+
+                  <AlertDialogFooter className="flex-row gap-3 px-5 py-4 shrink-0">
+                    <AlertDialogCancel className="flex-1 mt-0 h-13 bg-secondary border-border text-muted-foreground hover:bg-secondary/80 rounded-xl text-base font-semibold">
                       Abbrechen
                     </AlertDialogCancel>
                     <AlertDialogAction
-                      className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold"
+                      className="flex-1 h-13 bg-primary hover:bg-primary/90 active:scale-[0.97] transition-all text-primary-foreground rounded-xl text-base font-black"
                       onClick={handleOrderAndPay}
                     >
                       Kassieren

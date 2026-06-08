@@ -520,13 +520,35 @@ func deleteUser(u User, db *sql.DB) error {
 	return err
 }
 
-func getPrinterSettings(db *sql.DB) (string, error) {
+func defaultPrinterSettings() PrinterSettingsConfig {
+	return PrinterSettingsConfig{
+		PrintBarOrders: true,
+		Rules: []PrinterRule{
+			{ID: "1", BarName: "Bar 1", Categories: []string{}},
+		},
+	}
+}
+
+func getPrinterSettings(db *sql.DB) (PrinterSettingsConfig, error) {
 	var raw string
 	err := db.QueryRow("SELECT settings_json FROM printer_settings WHERE id=1").Scan(&raw)
 	if err == sql.ErrNoRows {
-		return `{"printBarOrders":true,"rules":[{"id":"1","tableFrom":1,"tableTo":99,"barName":"Bar 1"}]}`, nil
+		return defaultPrinterSettings(), nil
 	}
-	return raw, err
+	if err != nil {
+		return defaultPrinterSettings(), err
+	}
+	var cfg PrinterSettingsConfig
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return defaultPrinterSettings(), err
+	}
+	// Ensure Categories slice is never nil
+	for i := range cfg.Rules {
+		if cfg.Rules[i].Categories == nil {
+			cfg.Rules[i].Categories = []string{}
+		}
+	}
+	return cfg, nil
 }
 
 func savePrinterSettingsDB(db *sql.DB, raw string) error {
@@ -547,4 +569,75 @@ func resetAutoIncrementForOrders(db *sql.DB) error {
 	query := "ALTER TABLE `bestellungen` AUTO_INCREMENT = 1;"
 	_, err := db.Exec(query)
 	return err
+}
+
+// ensurePushTables creates the push_subscriptions and app_config tables if they
+// don't exist. Called once at startup so no schema migration file is needed.
+func ensurePushTables(db *sql.DB) error {
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+		id         INT AUTO_INCREMENT PRIMARY KEY,
+		endpoint   TEXT NOT NULL,
+		p256dh     TEXT NOT NULL,
+		auth       TEXT NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE KEY uq_endpoint (endpoint(512))
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS app_config (
+		key_name   VARCHAR(128) PRIMARY KEY,
+		value      TEXT NOT NULL
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+	return err
+}
+
+func getAppConfig(db *sql.DB, key string) (string, error) {
+	var val string
+	err := db.QueryRow("SELECT value FROM app_config WHERE key_name=?", key).Scan(&val)
+	return val, err
+}
+
+func setAppConfig(db *sql.DB, key, value string) error {
+	_, err := db.Exec(
+		"INSERT INTO app_config (key_name, value) VALUES (?,?) ON DUPLICATE KEY UPDATE value=VALUES(value)",
+		key, value,
+	)
+	return err
+}
+
+type PushSubscription struct {
+	Endpoint string `json:"endpoint"`
+	P256DH   string `json:"p256dh"`
+	Auth     string `json:"auth"`
+}
+
+func savePushSubscription(db *sql.DB, sub PushSubscription) error {
+	_, err := db.Exec(
+		"INSERT INTO push_subscriptions (endpoint, p256dh, auth) VALUES (?,?,?) ON DUPLICATE KEY UPDATE p256dh=VALUES(p256dh), auth=VALUES(auth)",
+		sub.Endpoint, sub.P256DH, sub.Auth,
+	)
+	return err
+}
+
+func deletePushSubscription(db *sql.DB, endpoint string) error {
+	_, err := db.Exec("DELETE FROM push_subscriptions WHERE endpoint=?", endpoint)
+	return err
+}
+
+func getAllPushSubscriptions(db *sql.DB) ([]PushSubscription, error) {
+	rows, err := db.Query("SELECT endpoint, p256dh, auth FROM push_subscriptions")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var subs []PushSubscription
+	for rows.Next() {
+		var s PushSubscription
+		if err := rows.Scan(&s.Endpoint, &s.P256DH, &s.Auth); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, nil
 }

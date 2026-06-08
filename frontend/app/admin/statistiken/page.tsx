@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -698,88 +699,92 @@ export default function StatistikPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="flex flex-col gap-2 pt-0">
-            {filteredRechnungen.length === 0 ? (
-              <p className="text-center text-muted-foreground text-sm py-8 opacity-50">
-                Keine Rechnungen gefunden
-              </p>
-            ) : (
-              filteredRechnungen.map((r) => {
-                const isStorno = r.rechnung_typ === "STORNO";
-                const isExpanded = expandedId === r.rechnung_id;
-                return (
-                  <div
-                    key={r.rechnung_id}
-                    className={`border rounded-xl overflow-hidden ${
-                      isStorno ? "border-destructive/30 bg-destructive/5" : "border-border bg-card"
-                    }`}
-                  >
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : r.rechnung_id)}
-                      className="w-full flex items-center gap-3 p-3 text-left active:opacity-70 transition-opacity"
-                    >
+          <CardContent className="pt-0">
+            <ScrollArea className="h-[550px]">
+              <div className="flex flex-col gap-2">
+                {filteredRechnungen.length === 0 ? (
+                  <p className="text-center text-muted-foreground text-sm py-8 opacity-50">
+                    Keine Rechnungen gefunden
+                  </p>
+                ) : (
+                  filteredRechnungen.map((r) => {
+                    const isStorno = r.rechnung_typ === "STORNO";
+                    const isExpanded = expandedId === r.rechnung_id;
+                    return (
                       <div
-                        className={`rounded-lg p-2 shrink-0 ${
-                          isStorno ? "bg-destructive/10" : "bg-secondary"
+                        key={r.rechnung_id}
+                        className={`border rounded-xl overflow-hidden ${
+                          isStorno ? "border-destructive/30 bg-destructive/5" : "border-border bg-card"
                         }`}
                       >
-                        {isStorno ? (
-                          <RefreshCcw className="w-4 h-4 text-destructive" />
-                        ) : (
-                          <Receipt className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-foreground text-sm">
-                          Tisch {r.rechnung_tisch}
-                          {isStorno && (
-                            <span className="ml-2 text-destructive text-xs font-bold uppercase">
-                              Storno
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-muted-foreground text-xs truncate">
-                          {fmtDateTime(r.rechnung_erstellt_am)}
-                          {r.rechnung_kellner_id ? ` · ${r.rechnung_kellner_id}` : ""}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p
-                          className={`font-black text-sm ${
-                            isStorno ? "text-destructive" : "text-foreground"
-                          }`}
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : r.rechnung_id)}
+                          className="w-full flex items-center gap-3 p-3 text-left active:opacity-70 transition-opacity"
                         >
-                          {isStorno ? "-" : ""}
-                          {fmt(r.rechnung_gesamt)}
-                        </p>
-                        {isExpanded ? (
-                          <ChevronUp className="w-3.5 h-3.5 text-muted-foreground ml-auto mt-1" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground ml-auto mt-1" />
-                        )}
-                      </div>
-                    </button>
-                    {isExpanded && (
-                      <div className="border-t border-border px-3 pb-3 pt-2 bg-secondary/10">
-                        {r.rechnung_positionen.map((pos, idx) => (
-                          <div key={idx} className="flex justify-between text-xs py-0.5">
-                            <span className="text-foreground/80">
-                              {pos.amount}× {pos.name}
-                              {pos.kategorie && (
-                                <span className="text-muted-foreground ml-1.5">
-                                  ({pos.kategorie})
+                          <div
+                            className={`rounded-lg p-2 shrink-0 ${
+                              isStorno ? "bg-destructive/10" : "bg-secondary"
+                            }`}
+                          >
+                            {isStorno ? (
+                              <RefreshCcw className="w-4 h-4 text-destructive" />
+                            ) : (
+                              <Receipt className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-foreground text-sm">
+                              Tisch {r.rechnung_tisch}
+                              {isStorno && (
+                                <span className="ml-2 text-destructive text-xs font-bold uppercase">
+                                  Storno
                                 </span>
                               )}
-                            </span>
-                            <span className="text-muted-foreground">{fmt(pos.price * pos.amount)}</span>
+                            </p>
+                            <p className="text-muted-foreground text-xs truncate">
+                              {fmtDateTime(r.rechnung_erstellt_am)}
+                              {r.rechnung_kellner_id ? ` · ${r.rechnung_kellner_id}` : ""}
+                            </p>
                           </div>
-                        ))}
+                          <div className="text-right shrink-0">
+                            <p
+                              className={`font-black text-sm ${
+                                isStorno ? "text-destructive" : "text-foreground"
+                              }`}
+                            >
+                              {isStorno ? "-" : ""}
+                              {fmt(r.rechnung_gesamt)}
+                            </p>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5 text-muted-foreground ml-auto mt-1" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground ml-auto mt-1" />
+                            )}
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="border-t border-border px-3 pb-3 pt-2 bg-secondary/10">
+                            {r.rechnung_positionen.map((pos, idx) => (
+                              <div key={idx} className="flex justify-between text-xs py-0.5">
+                                <span className="text-foreground/80">
+                                  {pos.amount}× {pos.name}
+                                  {pos.kategorie && (
+                                    <span className="text-muted-foreground ml-1.5">
+                                      ({pos.kategorie})
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-muted-foreground">{fmt(pos.price * pos.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
 

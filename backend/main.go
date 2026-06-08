@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"log"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v5"
+	webpush "github.com/SherClockHolmes/webpush-go"
 
 	"bestellsystem_server/ws"
 )
@@ -487,6 +489,84 @@ func requireAdmin(r *http.Request) bool {
 	return role == "ADMIN"
 }
 
+// findPrinterForItem returns the first matching printer name for an item,
+// or "" if no rule matches.
+func findPrinterForItem(pos RechnungPosition, table int, settings PrinterSettingsConfig) string {
+	for _, rule := range settings.Rules {
+		if rule.TableFrom != nil && table < *rule.TableFrom {
+			continue
+		}
+		if rule.TableTo != nil && table > *rule.TableTo {
+			continue
+		}
+		if len(rule.Categories) > 0 {
+			matched := false
+			for _, cat := range rule.Categories {
+				if cat == pos.Kategorie {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		return rule.BarName
+	}
+	return ""
+}
+
+// routePrintJobs splits order items by printer and enqueues a PrintJob per printer.
+func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, orderID int64) {
+	// Bar orders (tisch=0) respect the printBarOrders toggle
+	if req.Tisch == 0 && !settings.PrintBarOrders {
+		return
+	}
+
+	jobType := req.Typ
+	if jobType == "" {
+		jobType = "RECHNUNG"
+	}
+	waiterName := waiterNameForPrint(req.KellnerId)
+
+	// Group items by target printer (preserving order)
+	type entry struct {
+		printer string
+		item    ws.OrderItem
+	}
+	grouped := make(map[string][]ws.OrderItem)
+	order := []string{}
+	seen := make(map[string]bool)
+
+	for _, pos := range req.Positionen {
+		printer := findPrinterForItem(pos, req.Tisch, settings)
+		if printer == "" {
+			continue
+		}
+		grouped[printer] = append(grouped[printer], ws.OrderItem{
+			Name:     pos.Name,
+			Quantity: pos.Amount,
+			Price:    pos.Price,
+			Note:     pos.Note,
+		})
+		if !seen[printer] {
+			order = append(order, printer)
+			seen[printer] = true
+		}
+	}
+
+	for _, printer := range order {
+		PrintHub.EnqueueAndSend(printer, &ws.PrintJob{
+			OrderID:    int(orderID),
+			JobType:    jobType,
+			Table:      req.Tisch,
+			WaiterName: waiterName,
+			Items:      grouped[printer],
+			Note:       req.Note,
+		})
+	}
+}
+
 func waiterNameForPrint(kellnerId string) string {
 	if kellnerId == "" {
 		return ""
@@ -523,28 +603,11 @@ func createRechnungHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.BarName != "" {
-		items := make([]ws.OrderItem, len(req.Positionen))
-		for i, p := range req.Positionen {
-			items[i] = ws.OrderItem{
-				Name:     p.Name,
-				Quantity: p.Amount,
-				Price:    p.Price,
-				Note:     p.Note,
-			}
-		}
-		jobType := req.Typ
-		if jobType == "" {
-			jobType = "RECHNUNG"
-		}
-		PrintHub.EnqueueAndSend(req.BarName, &ws.PrintJob{
-			OrderID:    int(id),
-			JobType:    jobType,
-			Table:      req.Tisch,
-			WaiterName: waiterNameForPrint(req.KellnerId),
-			Items:      items,
-			Note:       req.Note,
-		})
+	settings, settingsErr := getPrinterSettings(DB)
+	if settingsErr != nil {
+		log.Printf("error loading printer settings for routing: %v", settingsErr)
+	} else {
+		routePrintJobs(req, settings, id)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -606,14 +669,19 @@ func resetRechnungenHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getPrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
-	raw, err := getPrinterSettings(DB)
+	cfg, err := getPrinterSettings(DB)
 	if err != nil {
 		log.Printf("error getting printer settings: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write([]byte(raw))
+	w.Write(data)
 }
 
 func savePrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -666,9 +734,220 @@ func getLatestPDFStatisticsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// ─── VAPID key management ────────────────────────────────────────────────────
+
+var vapidPublicKey string
+var vapidPrivateKey string
+
+func initVAPIDKeys() {
+	pub, err := getAppConfig(DB, "vapid_public")
+	if err == sql.ErrNoRows || pub == "" {
+		privKey, pubKey, err := webpush.GenerateVAPIDKeys()
+		if err != nil {
+			log.Fatalf("failed to generate VAPID keys: %v", err)
+		}
+		_ = setAppConfig(DB, "vapid_public", pubKey)
+		_ = setAppConfig(DB, "vapid_private", privKey)
+		vapidPublicKey = pubKey
+		vapidPrivateKey = privKey
+		log.Printf("push: VAPID keys generated (public key: %.20s...)", pubKey)
+		return
+	}
+	if err != nil {
+		log.Fatalf("failed to load VAPID public key: %v", err)
+	}
+	priv, err := getAppConfig(DB, "vapid_private")
+	if err != nil {
+		log.Fatalf("failed to load VAPID private key: %v", err)
+	}
+	vapidPublicKey = pub
+	vapidPrivateKey = priv
+	log.Printf("push: VAPID keys loaded from DB (public key: %.20s...)", pub)
+}
+
+func sendPushToAll(title, body string) {
+	subs, err := getAllPushSubscriptions(DB)
+	if err != nil {
+		log.Printf("push: could not load subscriptions: %v", err)
+		return
+	}
+	if len(subs) == 0 {
+		log.Printf("push: no subscriptions registered — skipping send (title: %q)", title)
+		return
+	}
+	log.Printf("push: sending to %d subscriber(s) — %q", len(subs), title)
+	payload, _ := json.Marshal(map[string]string{"title": title, "body": body})
+	for i, sub := range subs {
+		s := &webpush.Subscription{
+			Endpoint: sub.Endpoint,
+			Keys: webpush.Keys{
+				P256dh: sub.P256DH,
+				Auth:   sub.Auth,
+			},
+		}
+		resp, err := webpush.SendNotification(payload, s, &webpush.Options{
+			VAPIDPublicKey:  vapidPublicKey,
+			VAPIDPrivateKey: vapidPrivateKey,
+			Subscriber:      "https://github.com/yschaffler/HGV-Bestellsystem",
+			TTL:             60,
+		})
+		if err != nil {
+			log.Printf("push[%d]: send error (endpoint: %.50s...): %v", i, sub.Endpoint, err)
+			continue
+		}
+		respBody := make([]byte, 512)
+		n, _ := resp.Body.Read(respBody)
+		resp.Body.Close()
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			log.Printf("push[%d]: delivered — HTTP %d (endpoint: %.50s...)", i, resp.StatusCode, sub.Endpoint)
+		} else {
+			log.Printf("push[%d]: failed — HTTP %d body: %s (endpoint: %.50s...)", i, resp.StatusCode, string(respBody[:n]), sub.Endpoint)
+		}
+		if resp.StatusCode == 410 || resp.StatusCode == 404 {
+			log.Printf("push[%d]: subscription expired, removing from DB", i)
+			_ = deletePushSubscription(DB, sub.Endpoint)
+		}
+		if resp.StatusCode == 403 {
+			log.Printf("push[%d]: VAPID public key in use: %.20s... — browser subscription may use a different key; client must re-subscribe", i, vapidPublicKey)
+		}
+	}
+}
+
+// staleDetectionLoop checks every minute for printer queues with jobs that are
+// stuck (client disconnected, jobs older than 3 minutes) and sends push alerts.
+func staleDetectionLoop() {
+	const checkInterval = time.Minute
+	const staleThreshold = 3 * time.Minute
+	alerted := make(map[string]bool)
+
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		stale := PrintHub.StaleQueues(staleThreshold)
+		nowAlerted := make(map[string]bool)
+		for _, info := range stale {
+			nowAlerted[info.Bar] = true
+			if !alerted[info.Bar] {
+				log.Printf("stale queue alert: bar=%q jobs=%d", info.Bar, len(info.Jobs))
+				go sendPushToAll(
+					"⚠️ Drucker nicht verbunden",
+					info.Bar+" hat "+strconv.Itoa(len(info.Jobs))+" Bon(s) in der Warteschlange – Druckerclient prüfen!",
+				)
+			}
+		}
+		alerted = nowAlerted
+	}
+}
+
+// ─── Printer queue API ───────────────────────────────────────────────────────
+
+func getPrinterQueuesHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	status := PrintHub.GetAllQueueStatus()
+	if status == nil {
+		status = []ws.QueueInfo{}
+	}
+	data, _ := json.Marshal(status)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
+func deletePrinterJobHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Bar     string `json:"bar"`
+		OrderID int    `json:"order_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Bar == "" || req.OrderID == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if PrintHub.DeleteJob(req.Bar, req.OrderID) {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func resendPrinterJobHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Bar     string `json:"bar"`
+		OrderID int    `json:"order_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Bar == "" || req.OrderID == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if PrintHub.ResendJob(req.Bar, req.OrderID) {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+// ─── Push notification API ───────────────────────────────────────────────────
+
+func getVAPIDPublicKeyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	data, _ := json.Marshal(map[string]string{"publicKey": vapidPublicKey})
+	w.Write(data)
+}
+
+func subscribePushHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var sub PushSubscription
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil || sub.Endpoint == "" {
+		log.Printf("push subscribe: bad request: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := savePushSubscription(DB, sub); err != nil {
+		log.Printf("push subscribe: error saving subscription: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Printf("push subscribe: new subscription saved (endpoint: %.60s...)", sub.Endpoint)
+	w.WriteHeader(http.StatusOK)
+}
+
+func unsubscribePushHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Endpoint string `json:"endpoint"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Endpoint == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	_ = deletePushSubscription(DB, req.Endpoint)
+	log.Printf("push unsubscribe: removed (endpoint: %.60s...)", req.Endpoint)
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	OpenDatabaseHandle()
+	if err := ensurePushTables(DB); err != nil {
+		log.Fatalf("failed to create push tables: %v", err)
+	}
+	initVAPIDKeys()
 	PrintHub = ws.NewHub(os.Getenv("PRINTER_SECRET"))
+	go staleDetectionLoop()
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
 	router.HandleFunc("/get/all-categories/", getCategories)
@@ -708,6 +987,14 @@ func main() {
 
 	router.HandleFunc("GET /settings/printer/", getPrinterSettingsHandler)
 	router.HandleFunc("POST /settings/printer/", savePrinterSettingsHandler)
+
+	router.HandleFunc("GET /admin/printer/queues/", getPrinterQueuesHandler)
+	router.HandleFunc("POST /admin/printer/queues/delete/", deletePrinterJobHandler)
+	router.HandleFunc("POST /admin/printer/queues/resend/", resendPrinterJobHandler)
+
+	router.HandleFunc("GET /push/vapid-public-key/", getVAPIDPublicKeyHandler)
+	router.HandleFunc("POST /push/subscribe/", subscribePushHandler)
+	router.HandleFunc("POST /push/unsubscribe/", unsubscribePushHandler)
 
 	router.HandleFunc("POST /login/", loginHandler)
 	router.HandleFunc("/me/", currentUser)

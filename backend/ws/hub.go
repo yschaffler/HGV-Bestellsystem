@@ -24,6 +24,13 @@ type ackMessage struct {
 	OrderID int    `json:"order_id"`
 }
 
+// QueueInfo represents the state of a single printer's queue.
+type QueueInfo struct {
+	Bar       string      `json:"bar"`
+	Connected bool        `json:"connected"`
+	Jobs      []*PrintJob `json:"jobs"`
+}
+
 type Hub struct {
 	secret string
 	mu     sync.Mutex
@@ -67,6 +74,103 @@ func (h *Hub) sendJob(conn *websocket.Conn, job *PrintJob) {
 	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 		log.Printf("ws send error: %v", err)
 	}
+}
+
+// GetAllQueueStatus returns the status of all known printer queues.
+func (h *Hub) GetAllQueueStatus() []QueueInfo {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	seen := make(map[string]bool)
+	var result []QueueInfo
+
+	for bar, q := range h.queues {
+		seen[bar] = true
+		jobs := q.Pending()
+		if jobs == nil {
+			jobs = []*PrintJob{}
+		}
+		result = append(result, QueueInfo{
+			Bar:       bar,
+			Connected: h.conns[bar] != nil,
+			Jobs:      jobs,
+		})
+	}
+	// Include connected bars that have no queued jobs yet
+	for bar := range h.conns {
+		if !seen[bar] {
+			result = append(result, QueueInfo{
+				Bar:       bar,
+				Connected: true,
+				Jobs:      []*PrintJob{},
+			})
+		}
+	}
+	return result
+}
+
+// DeleteJob removes a pending job from a bar's queue without printing it.
+func (h *Hub) DeleteJob(bar string, orderID int) bool {
+	h.mu.Lock()
+	q := h.queues[bar]
+	h.mu.Unlock()
+	if q == nil {
+		return false
+	}
+	return q.Delete(orderID)
+}
+
+// ResendJob re-sends an existing pending job to the bar client if connected.
+// Returns false if the job was not found or bar is not connected.
+func (h *Hub) ResendJob(bar string, orderID int) bool {
+	h.mu.Lock()
+	q := h.queues[bar]
+	conn := h.conns[bar]
+	h.mu.Unlock()
+	if q == nil || conn == nil {
+		return false
+	}
+	job := q.Find(orderID)
+	if job == nil {
+		return false
+	}
+	h.sendJob(conn, job)
+	return true
+}
+
+// StaleQueues returns bars that have jobs older than the given threshold and
+// whose printer client is currently not connected.
+func (h *Hub) StaleQueues(threshold time.Duration) []QueueInfo {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	var result []QueueInfo
+	now := time.Now()
+	for bar, q := range h.queues {
+		if h.conns[bar] != nil {
+			continue
+		}
+		jobs := q.Pending()
+		if len(jobs) == 0 {
+			continue
+		}
+		oldest := jobs[0].EnqueuedAt
+		for _, j := range jobs[1:] {
+			if j.EnqueuedAt.Before(oldest) {
+				oldest = j.EnqueuedAt
+			}
+		}
+		if now.Sub(oldest) >= threshold {
+			cp := make([]*PrintJob, len(jobs))
+			copy(cp, jobs)
+			result = append(result, QueueInfo{
+				Bar:       bar,
+				Connected: false,
+				Jobs:      cp,
+			})
+		}
+	}
+	return result
 }
 
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
