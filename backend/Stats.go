@@ -179,9 +179,11 @@ func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rec
 			mapKategorie[pos.Kategorie] += pos.Price * float64(pos.Amount)
 		}
 	}
-
 	for _, storno := range arrStorno {
 		for _, pos := range storno.Positionen {
+			if pos.Kategorie == "" {
+				continue
+			}
 			mapKategorie[pos.Kategorie] -= pos.Price * float64(pos.Amount)
 		}
 	}
