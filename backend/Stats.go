@@ -42,13 +42,13 @@ func getStatsForPDF() (core.Maroto, error) {
 
 	m.AddRow(5) //Leerzeile
 
-	if err := UmsatzProKategorie(m, arrRechnungen); err != nil {
+	if err := UmsatzProKategorie(m, arrRechnungen, arrStorno); err != nil {
 		return nil, err
 	}
 
 	m.AddRow(5) //Leerzeile
 
-	if err := ArtikelProKategorie(m, arrNonStorno); err != nil {
+	if err := ArtikelProKategorie(m, arrNonStorno, arrStorno); err != nil {
 		return nil, err
 	}
 
@@ -168,7 +168,7 @@ func TopArtikel(m core.Maroto) error {
 	return nil
 }
 
-func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
+func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error {
 	mapKategorie := make(map[string]float64)
 
 	for _, rechnung := range arrRechnungen {
@@ -177,6 +177,12 @@ func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 				continue
 			}
 			mapKategorie[pos.Kategorie] += pos.Price * float64(pos.Amount)
+		}
+	}
+
+	for _, storno := range arrStorno {
+		for _, pos := range storno.Positionen {
+			mapKategorie[pos.Kategorie] -= pos.Price * float64(pos.Amount)
 		}
 	}
 
@@ -207,7 +213,7 @@ func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 	return nil
 }
 
-func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
+func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error {
 	Kategorien, err := getAllCategories(DB)
 	verkaufMap := make(map[string]map[string]float64)
 	type artikelInfo struct {
@@ -228,6 +234,12 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 				verkaufMap[pos.Kategorie] = make(map[string]float64)
 			}
 			verkaufMap[pos.Kategorie][pos.Name] += float64(pos.Amount)
+		}
+	}
+
+	for _, storno := range arrStorno {
+		for _, pos := range storno.Positionen {
+			verkaufMap[pos.Kategorie][pos.Name] -= float64(pos.Amount)
 		}
 	}
 
