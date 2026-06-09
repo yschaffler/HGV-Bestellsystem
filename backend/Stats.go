@@ -7,7 +7,9 @@ import (
 
 	"github.com/johnfercher/maroto/v2"
 	"github.com/johnfercher/maroto/v2/pkg/components/text"
+	"github.com/johnfercher/maroto/v2/pkg/consts/fontstyle"
 	"github.com/johnfercher/maroto/v2/pkg/core"
+	"github.com/johnfercher/maroto/v2/pkg/props"
 )
 
 func getStatsForPDF() (core.Maroto, error) {
@@ -95,9 +97,9 @@ func UmsatzProKellner(m core.Maroto, arrRechnungen []Rechnung) error {
 	var KellnerUmsatzmap map[string]float64 = make(map[string]float64)
 
 	m.AddRow(5,
-		text.NewCol(4, "KellnerID"),
+		text.NewCol(4, "KellnerID", props.Text{Style: fontstyle.Bold}),
 		text.NewCol(4, "->"),
-		text.NewCol(4, "Gesamt"),
+		text.NewCol(4, "Gesamt", props.Text{Style: fontstyle.Bold}),
 	)
 
 	for i := 0; i < len(arrRechnungen); i++ {
@@ -117,6 +119,7 @@ func UmsatzProKellner(m core.Maroto, arrRechnungen []Rechnung) error {
 	return nil
 }
 
+// currently no used
 func TopArtikel(m core.Maroto) error {
 	arrRechnungen, err := getAllRechnungen(DB)
 	mapTopArtikel := make(map[string]float64)
@@ -136,7 +139,7 @@ func TopArtikel(m core.Maroto) error {
 	}
 
 	m.AddRow(5,
-		text.NewCol(4, "Top 3 Artikel:"),
+		text.NewCol(4, "Top 3 Artikel:", props.Text{Style: fontstyle.Bold}),
 	)
 
 	for i := 0; i < len(sortedArtikel); i++ {
@@ -159,7 +162,7 @@ func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 	}
 
 	m.AddRow(5,
-		text.NewCol(4, "Umsatz pro Kategorie:"),
+		text.NewCol(4, "Umsatz pro Kategorie:", props.Text{Style: fontstyle.Bold}),
 	)
 
 	type kategorieInfo struct {
@@ -184,6 +187,7 @@ func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 
 	return nil
 }
+
 func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 	Kategorien, err := getAllCategories(DB)
 	verkaufMap := make(map[string]map[string]float64)
@@ -205,6 +209,12 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 		}
 	}
 
+	m.AddRow(5,
+		text.NewCol(4, "Artikel", props.Text{Style: fontstyle.Bold}),
+		text.NewCol(4, "->"),
+		text.NewCol(4, "Menge Verkauft", props.Text{Style: fontstyle.Bold}),
+	)
+
 	for _, cat := range Kategorien {
 		artikelInKat, ok := verkaufMap[cat.Name]
 		if !ok || len(artikelInKat) == 0 {
@@ -221,13 +231,7 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 		})
 
 		m.AddRow(5,
-			text.NewCol(4, "Artikel"),
-			text.NewCol(4, "->"),
-			text.NewCol(4, "Menge"),
-		)
-
-		m.AddRow(5,
-			text.NewCol(4, cat.Name),
+			text.NewCol(4, cat.Name+":", props.Text{Style: fontstyle.Bold}),
 		)
 
 		for _, a := range artikelSlice {
