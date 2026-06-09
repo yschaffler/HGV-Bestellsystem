@@ -40,6 +40,7 @@ func getStatsForPDF() (core.Maroto, error) {
 		return nil, err
 	}
 
+	m.AddRow(5) //Leerzeile
 	if err := ArtikelProKategorie(m, arrRechnungen); err != nil {
 		return nil, err
 	}
@@ -171,12 +172,6 @@ func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 		return kategorieSlice[i].umsatz > kategorieSlice[j].umsatz
 	})
 
-	m.AddRow(5,
-		text.NewCol(4, "Kategorie"),
-		text.NewCol(4, "->"),
-		text.NewCol(4, "Umsatz"),
-	)
-
 	for _, k := range kategorieSlice {
 		m.AddRow(5,
 			text.NewCol(4, k.name),
@@ -218,7 +213,6 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 			text.NewCol(4, cat.Name),
 		)
 
-		// Artikel in slice sammeln und nach Menge sortieren (absteigend)
 		artikelSlice := make([]artikelInfo, 0, len(artikelInKat))
 		for name, menge := range artikelInKat {
 			artikelSlice = append(artikelSlice, artikelInfo{name: name, menge: menge})
@@ -231,6 +225,7 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 		// Tabellen-Header
 		m.AddRow(5,
 			text.NewCol(4, "Artikel"),
+			text.NewCol(4, "->"),
 			text.NewCol(4, "Menge"),
 		)
 
@@ -238,6 +233,7 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 		for _, a := range artikelSlice {
 			m.AddRow(5,
 				text.NewCol(4, a.name),
+				text.NewCol(4, ""),
 				text.NewCol(4, fmt.Sprintf("%.0f", a.menge)),
 			)
 		}
