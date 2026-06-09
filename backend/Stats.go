@@ -42,7 +42,7 @@ func getStatsForPDF() (core.Maroto, error) {
 
 	m.AddRow(5) //Leerzeile
 
-	if err := UmsatzProKategorie(m, arrStorno); err != nil {
+	if err := UmsatzProKategorie(m, arrRechnungen); err != nil {
 		return nil, err
 	}
 
@@ -90,18 +90,6 @@ func AnzahlVerkaufterArtikel(m core.Maroto, arrRechnungen []Rechnung) error {
 		for _, pos := range rechnung.Positionen {
 			Anzahl += pos.Amount
 		}
-	}
-	for _, storno := range arrRechnungen {
-		for _, pos := range storno.Positionen {
-			if pos.Amount < 0 {
-				Anzahl += pos.Amount
-			} else {
-				Anzahl -= pos.Amount
-			}
-		}
-	}
-	if Anzahl < 0 {
-		Anzahl = 0
 	}
 	m.AddRow(5,
 		text.NewCol(4, "Anzahl Verkaufter Artikel"),
@@ -230,21 +218,6 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 				verkaufMap[pos.Kategorie] = make(map[string]float64)
 			}
 			verkaufMap[pos.Kategorie][pos.Name] += float64(pos.Amount)
-		}
-	}
-	for _, storno := range arrRechnungen {
-		for _, pos := range storno.Positionen {
-			if pos.Kategorie == "" {
-				continue
-			}
-			if verkaufMap[pos.Kategorie] == nil {
-				verkaufMap[pos.Kategorie] = make(map[string]float64)
-			}
-			if pos.Amount < 0 {
-				verkaufMap[pos.Kategorie][pos.Name] += float64(pos.Amount)
-			} else {
-				verkaufMap[pos.Kategorie][pos.Name] -= float64(pos.Amount)
-			}
 		}
 	}
 
