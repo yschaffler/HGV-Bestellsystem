@@ -1002,15 +1002,6 @@ func main() {
 
 	router.HandleFunc("/reset/orders/", resetOrdersHandler)
 
-	http.HandleFunc("/admin/debug/stornos/", func(w http.ResponseWriter, r *http.Request) {
-		stornos, err := getAllStornos(DB)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		json.NewEncoder(w).Encode(stornos)
-	})
-
 	// Serve frontend static files
 	fs := http.FileServer(http.Dir("./public"))
 	router.Handle("/", fs)
