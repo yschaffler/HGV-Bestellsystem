@@ -41,10 +41,12 @@ func getStatsForPDF() (core.Maroto, error) {
 	}
 
 	m.AddRow(5) //Leerzeile
+
 	if err := ArtikelProKategorie(m, arrRechnungen); err != nil {
 		return nil, err
 	}
 
+	//^ ENTHÄLT LEERZEILE; KEINE WEITER BENÖIGT
 	return m, nil
 }
 
@@ -56,7 +58,7 @@ func Umsatz(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error
 	m.AddRow(5,
 		text.NewCol(4, "Umsatz mit Stornos"),
 		text.NewCol(4, "->"),
-		text.NewCol(4, fmt.Sprintf("%v", UmsatzGes)),
+		text.NewCol(4, fmt.Sprintf("%.2f €", UmsatzGes)),
 	)
 
 	m.AddRow(5) //Leerzeile
@@ -68,7 +70,7 @@ func Umsatz(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error
 	m.AddRow(5,
 		text.NewCol(4, "Gesamt Stornos"),
 		text.NewCol(4, "->"),
-		text.NewCol(4, fmt.Sprintf("%v", Storno)),
+		text.NewCol(4, fmt.Sprintf("%.2f €", Storno)),
 	)
 
 	m.AddRow(5) //Leerzeile
@@ -109,7 +111,7 @@ func UmsatzProKellner(m core.Maroto, arrRechnungen []Rechnung) error {
 		m.AddRow(5,
 			text.NewCol(4, fmt.Sprintf("%v", key)),
 			text.NewCol(4, fmt.Sprintf("%v", "->")),
-			text.NewCol(4, fmt.Sprintf("%v.2f", value)),
+			text.NewCol(4, fmt.Sprintf("%.2f €", value)),
 		)
 	}
 	return nil
@@ -141,7 +143,7 @@ func TopArtikel(m core.Maroto) error {
 		m.AddRow(5,
 			text.NewCol(4, fmt.Sprintf("%v", sortedArtikel[i])),
 			text.NewCol(4, "->"),
-			text.NewCol(4, fmt.Sprintf("%v", mapTopArtikel[sortedArtikel[i]])),
+			text.NewCol(4, fmt.Sprintf("%.2f €", mapTopArtikel[sortedArtikel[i]])),
 		)
 	}
 	return nil
@@ -209,10 +211,6 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 			continue
 		}
 
-		m.AddRow(5,
-			text.NewCol(4, cat.Name),
-		)
-
 		artikelSlice := make([]artikelInfo, 0, len(artikelInKat))
 		for name, menge := range artikelInKat {
 			artikelSlice = append(artikelSlice, artikelInfo{name: name, menge: menge})
@@ -222,14 +220,16 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 			return artikelSlice[i].menge > artikelSlice[j].menge
 		})
 
-		// Tabellen-Header
 		m.AddRow(5,
 			text.NewCol(4, "Artikel"),
 			text.NewCol(4, "->"),
 			text.NewCol(4, "Menge"),
 		)
 
-		// Zeilen
+		m.AddRow(5,
+			text.NewCol(4, cat.Name),
+		)
+
 		for _, a := range artikelSlice {
 			m.AddRow(5,
 				text.NewCol(4, a.name),
@@ -240,6 +240,5 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 
 		m.AddRow(5) //Leerzeile
 	}
-
 	return nil
 }
