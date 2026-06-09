@@ -30,7 +30,7 @@ func getStatsForPDF() (core.Maroto, error) {
 
 	m.AddRow(5) //Leerzeile
 
-	if err := AnzahlVerkaufterArtikel(m, arrNonStorno); err != nil {
+	if err := AnzahlVerkaufterArtikel(m, arrNonStorno, arrStorno); err != nil {
 		return nil, err
 	}
 
@@ -84,13 +84,23 @@ func Umsatz(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error
 	return nil
 }
 
-func AnzahlVerkaufterArtikel(m core.Maroto, arrRechnungen []Rechnung) error {
+func AnzahlVerkaufterArtikel(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error {
 	Anzahl := 0
 	for _, rechnung := range arrRechnungen {
 		for _, pos := range rechnung.Positionen {
 			Anzahl += pos.Amount
 		}
 	}
+	// Stornos abziehen
+	for _, storno := range arrStorno {
+		for _, pos := range storno.Positionen {
+			Anzahl -= pos.Amount
+		}
+	}
+	if Anzahl < 0 {
+		Anzahl = 0
+	}
+
 	m.AddRow(5,
 		text.NewCol(4, "Anzahl Verkaufter Artikel"),
 		text.NewCol(4, "->"),
