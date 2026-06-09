@@ -367,7 +367,7 @@ func getAllRechnungen(db *sql.DB) ([]Rechnung, error) {
 
 func getAllNonStornoRechnungen(db *sql.DB) ([]Rechnung, error) {
 	rows, err := db.Query(
-		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE typ!='STORNO' ORDER BY erstellt_am DESC",
+		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE typ = 'RECHNUNG' ORDER BY erstellt_am DESC",
 	)
 	if err != nil {
 		return []Rechnung{}, fmt.Errorf("error querying stornos: %v", err)

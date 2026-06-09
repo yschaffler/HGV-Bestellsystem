@@ -66,7 +66,7 @@ func Umsatz(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error
 
 	m.AddRow(5) //Leerzeile
 
-	UmsatzOhneStorno := UmsatzGes - Storno
+	UmsatzOhneStorno := UmsatzGes + Storno
 	m.AddRow(5,
 		text.NewCol(4, "Umsatz ohne Stornos"),
 		text.NewCol(4, "->"),
@@ -117,7 +117,7 @@ func UmsatzProKellner(m core.Maroto, arrRechnungen []Rechnung) error {
 func TopArtikel(m core.Maroto) error {
 	arrRechnungen, err := getAllRechnungen(DB)
 	mapTopArtikel := make(map[string]float64)
-	mengeReturnedArtikel := 0
+
 	if err != nil {
 		return err
 	}
@@ -135,10 +135,7 @@ func TopArtikel(m core.Maroto) error {
 		text.NewCol(4, "Top 3 Artikel:"),
 	)
 
-	if len(sortedArtikel) < mengeReturnedArtikel {
-		mengeReturnedArtikel = len(sortedArtikel)
-	}
-	for i := 0; i < mengeReturnedArtikel; i++ {
+	for i := 0; i < len(sortedArtikel); i++ {
 		m.AddRow(5,
 			text.NewCol(4, fmt.Sprintf("%v", sortedArtikel[i])),
 			text.NewCol(4, "->"),
