@@ -15,6 +15,9 @@ import (
 func getStatsForPDF() (core.Maroto, error) {
 	m := maroto.New()
 	arrRechnungen, err := getAllRechnungen(DB)
+	if err != nil {
+		return nil, err
+	}
 	arrStorno, err := getAllStornos(DB)
 	if err != nil {
 		return nil, err
@@ -82,8 +85,10 @@ func Umsatz(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error
 
 func AnzahlVerkaufterArtikel(m core.Maroto, arrRechnungen []Rechnung) error {
 	Anzahl := 0
-	for i := 0; i < len(arrRechnungen); i++ {
-		Anzahl += arrRechnungen[i].Positionen[0].Amount
+	for _, rechnung := range arrRechnungen {
+		for _, pos := range rechnung.Positionen {
+			Anzahl += pos.Amount
+		}
 	}
 	m.AddRow(5,
 		text.NewCol(4, "Anzahl Verkaufter Artikel"),
@@ -155,9 +160,12 @@ func TopArtikel(m core.Maroto) error {
 func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 	mapKategorie := make(map[string]float64)
 
-	for i := 0; i < len(arrRechnungen); i++ {
-		for j := 0; j < len(arrRechnungen[i].Positionen); j++ {
-			mapKategorie[arrRechnungen[i].Positionen[j].Kategorie] += arrRechnungen[i].Positionen[j].Price * float64(arrRechnungen[i].Positionen[j].Amount)
+	for _, rechnung := range arrRechnungen {
+		for _, pos := range rechnung.Positionen {
+			if pos.Kategorie == "" {
+				continue
+			}
+			mapKategorie[pos.Kategorie] += pos.Price * float64(pos.Amount)
 		}
 	}
 
@@ -202,6 +210,9 @@ func ArtikelProKategorie(m core.Maroto, arrRechnungen []Rechnung) error {
 
 	for _, rechnung := range arrRechnungen {
 		for _, pos := range rechnung.Positionen {
+			if pos.Kategorie == "" {
+				continue
+			}
 			if verkaufMap[pos.Kategorie] == nil {
 				verkaufMap[pos.Kategorie] = make(map[string]float64)
 			}
