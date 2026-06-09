@@ -15,6 +15,7 @@ import (
 func getStatsForPDF() (core.Maroto, error) {
 	m := maroto.New()
 	arrRechnungen, err := getAllRechnungen(DB)
+	arrNonStorno, err := getAllNonStornoRechnungen(DB)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +30,7 @@ func getStatsForPDF() (core.Maroto, error) {
 
 	m.AddRow(5) //Leerzeile
 
-	if err := AnzahlVerkaufterArtikel(m, arrRechnungen); err != nil {
+	if err := AnzahlVerkaufterArtikel(m, arrNonStorno); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +48,7 @@ func getStatsForPDF() (core.Maroto, error) {
 
 	m.AddRow(5) //Leerzeile
 
-	if err := ArtikelProKategorie(m, arrRechnungen); err != nil {
+	if err := ArtikelProKategorie(m, arrNonStorno); err != nil {
 		return nil, err
 	}
 
