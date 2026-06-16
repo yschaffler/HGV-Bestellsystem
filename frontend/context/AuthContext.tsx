@@ -54,6 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const isProtected =
         pathname?.startsWith("/settings") ||
         pathname?.startsWith("/kellner") ||
+        pathname?.startsWith("/bar") ||
         pathname?.startsWith("/admin");
 
       if (!user && isProtected) {
@@ -85,6 +86,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const isProtected =
     pathname?.startsWith("/settings") ||
     pathname?.startsWith("/kellner") ||
+    pathname?.startsWith("/bar") ||
     pathname?.startsWith("/admin");
   if (!user && isProtected) {
     return null;
