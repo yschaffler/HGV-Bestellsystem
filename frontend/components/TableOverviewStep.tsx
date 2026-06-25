@@ -313,6 +313,7 @@ export function TableOverviewStep({ waiterId, table, onBack }: Props) {
       if (navigator.vibrate) navigator.vibrate([15, 40, 15]);
       setCart([]);
       setMode("home");
+      onBack();
     } catch {
       setError("Fehler beim Kassieren.");
     } finally {
