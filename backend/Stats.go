@@ -135,39 +135,6 @@ func UmsatzProKellner(m core.Maroto, arrRechnungen []Rechnung) error {
 	return nil
 }
 
-// currently no used
-func TopArtikel(m core.Maroto) error {
-	arrRechnungen, err := getAllRechnungen(DB)
-	mapTopArtikel := make(map[string]float64)
-
-	if err != nil {
-		return err
-	}
-	for i := 0; i < len(arrRechnungen); i++ {
-		for j := 0; j < len(arrRechnungen[i].Positionen); j++ {
-			mapTopArtikel[arrRechnungen[i].Positionen[j].Name] += float64(arrRechnungen[i].Positionen[j].Amount)
-		}
-	}
-
-	sortedArtikel := make([]string, 0, len(mapTopArtikel))
-	for key := range mapTopArtikel {
-		sortedArtikel = append(sortedArtikel, key)
-	}
-
-	m.AddRow(5,
-		text.NewCol(4, "Top 3 Artikel:", props.Text{Style: fontstyle.Bold}),
-	)
-
-	for i := 0; i < len(sortedArtikel); i++ {
-		m.AddRow(5,
-			text.NewCol(4, fmt.Sprintf("%v", sortedArtikel[i])),
-			text.NewCol(4, "->"),
-			text.NewCol(4, fmt.Sprintf("%.2f €", mapTopArtikel[sortedArtikel[i]])),
-		)
-	}
-	return nil
-}
-
 func UmsatzProKategorie(m core.Maroto, arrRechnungen []Rechnung, arrStorno []Rechnung) error {
 	mapKategorie := make(map[string]float64)
 
