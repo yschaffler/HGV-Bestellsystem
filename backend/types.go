@@ -2,6 +2,7 @@ package main
 
 import "time"
 
+//Type definition for a product as defined in the database schema
 type Product struct {
 	Product_Id int     `json:"product_id"`
 	Price      float64 `json:"price"`
@@ -9,6 +10,7 @@ type Product struct {
 	Category   int     `json:"category"`
 }
 
+//Type definition for a product category as defined in the database schema
 type Category struct {
 	Category_Id int    `json:"category_id"`
 	Name        string `json:"category_name"`
@@ -25,6 +27,7 @@ type Order struct {
 	Table   int     `json:"order_table"`
 }
 
+//PayItem and PayRequest are used for handling payment of an order
 type PayItem struct {
 	Product int `json:"product"`
 	Amount  int `json:"amount"`
@@ -83,6 +86,7 @@ type PrinterSettingsConfig struct {
 	Rules          []PrinterRule `json:"rules"`
 }
 
+//Type definition for a user as defined in the database schema
 type User struct {
 	Id       int    `json:"user_id"`
 	Username string `json:"user_username"`
@@ -91,6 +95,7 @@ type User struct {
 	Role     string `json:"user_role"`
 }
 
+//Type definition for a login request containing all the necessary information needed for user authentication
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

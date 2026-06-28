@@ -12,6 +12,8 @@ import (
 
 var DB *sql.DB
 
+//initialising the database connection
+//the necessary credentials are extracted from the environment variables
 func OpenDatabaseHandle() {
 	if DB != nil {
 		return
@@ -37,6 +39,7 @@ func OpenDatabaseHandle() {
 	DB = db
 }
 
+//get all products from the db
 func getAllProducts(db *sql.DB) ([]Product, error) {
 	var products []Product
 	rows, err := db.Query("SELECT * FROM test_produkte;")
@@ -55,6 +58,7 @@ func getAllProducts(db *sql.DB) ([]Product, error) {
 	return products, nil
 }
 
+//insert a product into the db
 func insertProduct(p Product, db *sql.DB) error {
 	query := fmt.Sprintf("insert into test_produkte (price, name, product_category) values (%v, \"%v\", %v);", p.Price, p.Name, p.Category)
 	_, err := db.Exec(query)
@@ -64,18 +68,21 @@ func insertProduct(p Product, db *sql.DB) error {
 	return nil
 }
 
+//update a product in the db
 func updateProduct(p Product, db *sql.DB) error {
 	query := fmt.Sprintf("update test_produkte set price=%v, name=\"%v\", product_category=%v where id=%v;", p.Price, p.Name, p.Category, p.Product_Id)
 	_, err := db.Exec(query)
 	return err
 }
 
+//delete a product from the db
 func deleteProduct(id int, db *sql.DB) error {
 	query := fmt.Sprintf("delete from test_produkte where id=%v;", id)
 	_, err := db.Exec(query)
 	return err
 }
 
+//get all product categories from the db
 func getAllCategories(db *sql.DB) ([]Category, error) {
 	var cats []Category
 	rows, err := db.Query("SELECT * FROM produkt_kategorien;")
@@ -94,30 +101,35 @@ func getAllCategories(db *sql.DB) ([]Category, error) {
 	return cats, nil
 }
 
+//insert a product category into the db
 func insertCategory(c Category, db *sql.DB) error {
 	query := fmt.Sprintf("insert into produkt_kategorien (name, color) values (\"%v\", \"%v\");", c.Name, c.Color)
 	_, err := db.Exec(query)
 	return err
 }
 
+//update a product category in the db
 func updateCategory(c Category, db *sql.DB) error {
 	query := fmt.Sprintf("update produkt_kategorien set name=\"%v\", color=\"%v\" where id=%v;", c.Name, c.Color, c.Category_Id)
 	_, err := db.Exec(query)
 	return err
 }
 
+//delete a product category from the db
 func deleteCategory(id int, db *sql.DB) error {
 	query := fmt.Sprintf("delete from produkt_kategorien where id=%v;", id)
 	_, err := db.Exec(query)
 	return err
 }
 
+//insert a order into the db
 func insertOrder(o Order, db *sql.DB) error {
 	query := fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, `table`) VALUES (%v, %v, %v, %v, %v);", o.Product, o.Amount, o.Price, o.Payed, o.Table)
 	_, err := db.Exec(query)
 	return err
 }
 
+//get every unpaid order from the db
 func getUnpaidOrders(db *sql.DB) ([]Order, error) {
 	var orders []Order
 	rows, err := db.Query("SELECT * FROM bestellungen WHERE payed=false;")
@@ -136,6 +148,7 @@ func getUnpaidOrders(db *sql.DB) ([]Order, error) {
 	return orders, nil
 }
 
+//return all unpaid orders of a table from the db
 func getOpenOrdersForTable(table int, db *sql.DB) ([]Order, error) {
 	var orders []Order
 	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE `table`=%v AND payed=false;", table)
@@ -155,6 +168,7 @@ func getOpenOrdersForTable(table int, db *sql.DB) ([]Order, error) {
 	return orders, nil
 }
 
+//get all orders for a table from the db
 func getAllOrdersForTable(table int, db *sql.DB) ([]Order, error) {
 	var orders []Order
 	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE `table`=%v;", table)
@@ -174,6 +188,7 @@ func getAllOrdersForTable(table int, db *sql.DB) ([]Order, error) {
 	return orders, nil
 }
 
+//returns all orders from the db
 func getAllOrders(db *sql.DB) ([]Order, error) {
 	var orders []Order
 	rows, err := db.Query("SELECT * FROM bestellungen;")
@@ -192,18 +207,21 @@ func getAllOrders(db *sql.DB) ([]Order, error) {
 	return orders, nil
 }
 
+//update order in the db
 func updateOrder(o Order, db *sql.DB) error {
 	query := fmt.Sprintf("UPDATE bestellungen SET product=%v, amount=%v, price=%v, payed=%v, `table`=%v WHERE id=%v;", o.Product, o.Amount, o.Price, o.Payed, o.Table, o.Id)
 	_, err := db.Exec(query)
 	return err
 }
 
+//delete order from the db
 func deleteOrder(o Order, db *sql.DB) error {
 	query := fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v;", o.Id)
 	_, err := db.Exec(query)
 	return err
 }
 
+//pay items ordered by a table
 func payTableItems(table int, items []PayItem, db *sql.DB) error {
 	for _, item := range items {
 		amountToPay := item.Amount
@@ -248,6 +266,7 @@ func payTableItems(table int, items []PayItem, db *sql.DB) error {
 	return nil
 }
 
+//updates the items ordered from a table
 func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 	for _, item := range items {
 		amountToReturn := item.Amount
@@ -291,6 +310,7 @@ func returnTableItems(table int, items []PayItem, db *sql.DB) error {
 	return nil
 }
 
+//insert a rechnung into the db
 func insertRechnung(req CreateRechnungRequest, db *sql.DB) (int64, error) {
 	data, err := json.Marshal(req.Positionen)
 	if err != nil {
@@ -310,6 +330,7 @@ func insertRechnung(req CreateRechnungRequest, db *sql.DB) (int64, error) {
 	return result.LastInsertId()
 }
 
+//returns every rechnung for a table
 func getRechnungenForTable(table int, db *sql.DB) ([]Rechnung, error) {
 	rows, err := db.Query(
 		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE tisch=? ORDER BY erstellt_am DESC",
@@ -338,6 +359,7 @@ func getRechnungenForTable(table int, db *sql.DB) ([]Rechnung, error) {
 	return rechnungen, nil
 }
 
+//get every rechnung
 func getAllRechnungen(db *sql.DB) ([]Rechnung, error) {
 	rows, err := db.Query(
 		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen ORDER BY erstellt_am DESC",
@@ -365,6 +387,7 @@ func getAllRechnungen(db *sql.DB) ([]Rechnung, error) {
 	return rechnungen, nil
 }
 
+//get all rechnungen that are not a storno
 func getAllNonStornoRechnungen(db *sql.DB) ([]Rechnung, error) {
 	rows, err := db.Query(
 		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE typ = 'RECHNUNG' ORDER BY erstellt_am DESC",
@@ -392,6 +415,7 @@ func getAllNonStornoRechnungen(db *sql.DB) ([]Rechnung, error) {
 	return rechnungen, nil
 }
 
+//get all stornos
 func getAllStornos(db *sql.DB) ([]Rechnung, error) {
 	rows, err := db.Query(
 		"SELECT id, tisch, typ, erstellt_am, gesamt, positionen, kellner_id FROM rechnungen WHERE typ='STORNO' ORDER BY erstellt_am DESC",
@@ -419,6 +443,7 @@ func getAllStornos(db *sql.DB) ([]Rechnung, error) {
 	return rechnungen, nil
 }
 
+//resets the rechnungen
 func resetRechnungen(db *sql.DB) error {
 	if _, err := db.Exec("DELETE FROM `rechnungen`;"); err != nil {
 		return err
@@ -427,6 +452,7 @@ func resetRechnungen(db *sql.DB) error {
 	return err
 }
 
+//creates a user in the db
 func createUser(u User, db *sql.DB) error {
 	query := fmt.Sprintf("INSERT INTO `user` (`username`, `name`, `password`, `role`) VALUES (\"%v\", \"%v\", \"%v\", \"%v\");",
 		u.Username, u.Name, u.Password, u.Role)
@@ -452,6 +478,7 @@ func getGesamt_KellnerIdFromRechnungnen(db *sql.DB) ([]Rechnung, error) {
 	return rechnungen, nil
 }
 
+//retrieves user info by the user id
 func getUserById(id int, db *sql.DB) (User, error) {
 	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `role` FROM `user` WHERE `id`=%v;", id)
 	rows := db.QueryRow(query)
@@ -463,6 +490,7 @@ func getUserById(id int, db *sql.DB) (User, error) {
 	return u, nil
 }
 
+//retrieves all users from the db
 func getAllUsers(db *sql.DB) ([]User, error) {
 	query := "SELECT `id`, `username`, `name`, `role` FROM `user`;"
 	rows, err := db.Query(query)
@@ -482,6 +510,7 @@ func getAllUsers(db *sql.DB) ([]User, error) {
 	return users, nil
 }
 
+//retrieve the user info by username from the db
 func getUserByUsername(username string, db *sql.DB) (User, error) {
 	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `password`, `role` FROM `user` WHERE `username`=\"%v\";", username)
 	row := db.QueryRow(query)
@@ -493,6 +522,7 @@ func getUserByUsername(username string, db *sql.DB) (User, error) {
 	return u, nil
 }
 
+//updates the user info
 func updateUser(u User, db *sql.DB) error {
 	if u.Password == "" {
 		return updateUserWithoutPassword(u, db)
@@ -500,6 +530,7 @@ func updateUser(u User, db *sql.DB) error {
 	return updateUserWithPassword(u, db)
 }
 
+//update user info containing also the password
 func updateUserWithPassword(u User, db *sql.DB) error {
 	query := fmt.Sprintf("UPDATE `user` SET `username`=\"%v\", `name`=\"%v\", `password`=\"%v\", `role`=\"%v\" WHERE `id`=%v",
 		u.Username, u.Name, u.Password, u.Role, u.Id)
@@ -507,6 +538,7 @@ func updateUserWithPassword(u User, db *sql.DB) error {
 	return err
 }
 
+//only update the user info but not the password
 func updateUserWithoutPassword(u User, db *sql.DB) error {
 	query := fmt.Sprintf("UPDATE `user` SET `username`=\"%v\", `name`=\"%v\", `role`=\"%v\" WHERE `id`=%v",
 		u.Username, u.Name, u.Role, u.Id)
@@ -514,12 +546,14 @@ func updateUserWithoutPassword(u User, db *sql.DB) error {
 	return err
 }
 
+//delete a user from the db
 func deleteUser(u User, db *sql.DB) error {
 	query := fmt.Sprintf("DELETE FROM `user` WHERE `id`=%v;", u.Id)
 	_, err := db.Exec(query)
 	return err
 }
 
+//returns the default printer settings
 func defaultPrinterSettings() PrinterSettingsConfig {
 	return PrinterSettingsConfig{
 		PrintBarOrders: true,
@@ -529,6 +563,7 @@ func defaultPrinterSettings() PrinterSettingsConfig {
 	}
 }
 
+//retrieve the printer settings from the db
 func getPrinterSettings(db *sql.DB) (PrinterSettingsConfig, error) {
 	var raw string
 	err := db.QueryRow("SELECT settings_json FROM printer_settings WHERE id=1").Scan(&raw)
@@ -551,6 +586,7 @@ func getPrinterSettings(db *sql.DB) (PrinterSettingsConfig, error) {
 	return cfg, nil
 }
 
+//save printer settings to the db
 func savePrinterSettingsDB(db *sql.DB, raw string) error {
 	_, err := db.Exec(
 		"INSERT INTO printer_settings (id, settings_json) VALUES (1, ?) ON DUPLICATE KEY UPDATE settings_json=VALUES(settings_json)",
@@ -559,12 +595,14 @@ func savePrinterSettingsDB(db *sql.DB, raw string) error {
 	return err
 }
 
+//resets the order table
 func resetOrders(db *sql.DB) error {
 	query := "DELETE FROM `bestellungen`;"
 	_, err := db.Exec(query)
 	return err
 }
 
+//reset the autoincrement counter for the order table
 func resetAutoIncrementForOrders(db *sql.DB) error {
 	query := "ALTER TABLE `bestellungen` AUTO_INCREMENT = 1;"
 	_, err := db.Exec(query)
@@ -592,12 +630,14 @@ func ensurePushTables(db *sql.DB) error {
 	return err
 }
 
+//get the app config from the db
 func getAppConfig(db *sql.DB, key string) (string, error) {
 	var val string
 	err := db.QueryRow("SELECT value FROM app_config WHERE key_name=?", key).Scan(&val)
 	return val, err
 }
 
+//setting the app config in the db
 func setAppConfig(db *sql.DB, key, value string) error {
 	_, err := db.Exec(
 		"INSERT INTO app_config (key_name, value) VALUES (?,?) ON DUPLICATE KEY UPDATE value=VALUES(value)",
@@ -606,12 +646,14 @@ func setAppConfig(db *sql.DB, key, value string) error {
 	return err
 }
 
+//type definition for a push subscribtion 
 type PushSubscription struct {
 	Endpoint string `json:"endpoint"`
 	P256DH   string `json:"p256dh"`
 	Auth     string `json:"auth"`
 }
 
+//add a push subscribtion to the db
 func savePushSubscription(db *sql.DB, sub PushSubscription) error {
 	_, err := db.Exec(
 		"INSERT INTO push_subscriptions (endpoint, p256dh, auth) VALUES (?,?,?) ON DUPLICATE KEY UPDATE p256dh=VALUES(p256dh), auth=VALUES(auth)",
@@ -620,11 +662,13 @@ func savePushSubscription(db *sql.DB, sub PushSubscription) error {
 	return err
 }
 
+//delete a push subscribtion from the db
 func deletePushSubscription(db *sql.DB, endpoint string) error {
 	_, err := db.Exec("DELETE FROM push_subscriptions WHERE endpoint=?", endpoint)
 	return err
 }
 
+//returns all push subscribtions from the database
 func getAllPushSubscriptions(db *sql.DB) ([]PushSubscription, error) {
 	rows, err := db.Query("SELECT endpoint, p256dh, auth FROM push_subscriptions")
 	if err != nil {

@@ -22,6 +22,7 @@ import (
 
 var PrintHub *ws.Hub
 
+// -- the following functions contain the CRUD operations on the product table --
 func getProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := getAllProducts(DB)
 	if err != nil {
@@ -39,22 +40,6 @@ func getProducts(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func getCategories(w http.ResponseWriter, r *http.Request) {
-	categories, err := getAllCategories(DB)
-	if err != nil {
-		log.Printf("error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	data, err := json.Marshal(categories)
-	if err != nil {
-		log.Printf("error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(data)
-}
 func addProduct(w http.ResponseWriter, r *http.Request) {
 	var p Product
 	err := json.NewDecoder(r.Body).Decode(&p)
@@ -100,6 +85,24 @@ func deleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//-- the following functions contain the CRUD operations for the category table from the database --
+func getCategories(w http.ResponseWriter, r *http.Request) {
+	categories, err := getAllCategories(DB)
+	if err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(categories)
+	if err != nil {
+		log.Printf("error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
+}
+
 func addCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	var c Category
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
@@ -142,6 +145,8 @@ func deleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//--  the following functions contain the CRUD operations for the Order table from the database
+//and some additional operations on the order table --
 func createOrderHandler(w http.ResponseWriter, r *http.Request) {
 	var o Order
 	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
@@ -289,6 +294,7 @@ func returnOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//-- the following functions contain the CRUD operations for the user table from the database ---
 func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var u User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
@@ -384,6 +390,7 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//handles user login
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var lrq LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&lrq); err != nil {
@@ -423,6 +430,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//provides the data of the current user from the cookie
 func currentUser(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("auth_token")
 	if err != nil {
@@ -459,6 +467,7 @@ func currentUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//handles user logout
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
@@ -470,6 +479,8 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//returns true when the account of the user possesses the admin role and otherwise returns false,
+//used for securing endpoints that require admin privileges
 func requireAdmin(r *http.Request) bool {
 	cookie, err := r.Cookie("auth_token")
 	if err != nil {
@@ -567,6 +578,7 @@ func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, o
 	}
 }
 
+//provides the name of a waiter for printing on a bon
 func waiterNameForPrint(kellnerId string) string {
 	if kellnerId == "" {
 		return ""
@@ -589,6 +601,7 @@ func waiterNameForPrint(kellnerId string) string {
 	return u.Username
 }
 
+//create a new rechnung
 func createRechnungHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateRechnungRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -613,6 +626,7 @@ func createRechnungHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//returns the rechnungen for a specific table
 func getRechnungenForTableHandler(w http.ResponseWriter, r *http.Request) {
 	idString := r.PathValue("id")
 	id, err := strconv.Atoi(idString)
@@ -635,6 +649,7 @@ func getRechnungenForTableHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+//returns all rechnungen
 func getAllRechnungenHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -655,6 +670,7 @@ func getAllRechnungenHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+//handler for resetting the rechnungen
 func resetRechnungenHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -668,6 +684,7 @@ func resetRechnungenHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//handler for returning the printer settings
 func getPrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
 	cfg, err := getPrinterSettings(DB)
 	if err != nil {
@@ -684,6 +701,7 @@ func getPrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+//a handler for saving the printer settings
 func savePrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -702,6 +720,7 @@ func savePrinterSettingsHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//handler for resetting the orders
 func resetOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	if err := resetOrders(DB); err != nil {
 		log.Printf("error resetting the database: %v", err)
@@ -716,6 +735,7 @@ func resetOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//returns the latest statistics in pdf format to the user
 func getLatestPDFStatisticsHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := getStatsForPDF()
 	if err != nil {
@@ -739,6 +759,7 @@ func getLatestPDFStatisticsHandler(w http.ResponseWriter, r *http.Request) {
 var vapidPublicKey string
 var vapidPrivateKey string
 
+//initialise VAPID keys
 func initVAPIDKeys() {
 	pub, err := getAppConfig(DB, "vapid_public")
 	if err == sql.ErrNoRows || pub == "" {
@@ -765,6 +786,7 @@ func initVAPIDKeys() {
 	log.Printf("push: VAPID keys loaded from DB (public key: %.20s...)", pub)
 }
 
+//sends a push notification to all subscribed users
 func sendPushToAll(title, body string) {
 	subs, err := getAllPushSubscriptions(DB)
 	if err != nil {
@@ -841,6 +863,7 @@ func staleDetectionLoop() {
 
 // ─── Printer queue API ───────────────────────────────────────────────────────
 
+//handler for the endpoint responsible for returning the jobs in the printer queue
 func getPrinterQueuesHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -855,6 +878,7 @@ func getPrinterQueuesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+//handler for the endpoint responsible for deleting a printer job
 func deletePrinterJobHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -875,6 +899,7 @@ func deletePrinterJobHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//handler for the endpoint responsible for resending a printer jon
 func resendPrinterJobHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -896,13 +921,14 @@ func resendPrinterJobHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ─── Push notification API ───────────────────────────────────────────────────
-
+//handler for the endpoint responsible for providing the VAPID public key
 func getVAPIDPublicKeyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	data, _ := json.Marshal(map[string]string{"publicKey": vapidPublicKey})
 	w.Write(data)
 }
 
+//handler for the endpoint responsible for unsubscribing to Push-Notifications
 func subscribePushHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -923,6 +949,7 @@ func subscribePushHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//handler for the endpoint responsible for unsubscribing to Push-Notifications
 func unsubscribePushHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireAdmin(r) {
 		w.WriteHeader(http.StatusForbidden)
@@ -940,6 +967,7 @@ func unsubscribePushHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//main entrypoint for the program, establishing a database connection, setting up all server endpoints and serving
 func main() {
 	OpenDatabaseHandle()
 	if err := ensurePushTables(DB); err != nil {
