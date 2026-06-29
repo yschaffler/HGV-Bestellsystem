@@ -31,6 +31,7 @@ type QueueInfo struct {
 	Jobs      []*PrintJob `json:"jobs"`
 }
 
+//A hub is used to send the individual printer jobs to the corresponding printer via websockets
 type Hub struct {
 	secret string
 	mu     sync.Mutex
@@ -38,6 +39,7 @@ type Hub struct {
 	queues map[string]*printQueue
 }
 
+//creates a new hub with a specified secret
 func NewHub(secret string) *Hub {
 	return &Hub{
 		secret: secret,
@@ -46,6 +48,7 @@ func NewHub(secret string) *Hub {
 	}
 }
 
+//returns the queue corresponding to the bar specified in the parameter
 func (h *Hub) getQueue(bar string) *printQueue {
 	if q, ok := h.queues[bar]; ok {
 		return q
@@ -69,6 +72,7 @@ func (h *Hub) EnqueueAndSend(bar string, job *PrintJob) {
 	}
 }
 
+//sends the printer job via the connection specified in the parameters
 func (h *Hub) sendJob(conn *websocket.Conn, job *PrintJob) {
 	data, _ := json.Marshal(outMessage{Type: "print_job", Payload: job})
 	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
@@ -173,6 +177,7 @@ func (h *Hub) StaleQueues(threshold time.Duration) []QueueInfo {
 	return result
 }
 
+//this function is responsible for listening for and then upgrading the incoming http request to a websocket connection
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("secret") != h.secret {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -237,6 +242,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("printer client disconnected: bar=%q", bar)
 }
 
+//periodically sends a packet to a connected bar to make sure its still alive
 func (h *Hub) pingLoop(bar string, conn *websocket.Conn) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
