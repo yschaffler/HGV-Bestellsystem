@@ -8,22 +8,119 @@ import (
 
 	"github.com/johnfercher/maroto/v2"
 	"github.com/johnfercher/maroto/v2/pkg/components/image"
-	"github.com/johnfercher/maroto/v2/pkg/components/line"
+	"github.com/johnfercher/maroto/v2/pkg/components/row"
 	"github.com/johnfercher/maroto/v2/pkg/components/text"
+	"github.com/johnfercher/maroto/v2/pkg/config"
 	"github.com/johnfercher/maroto/v2/pkg/consts/align"
+	"github.com/johnfercher/maroto/v2/pkg/consts/border"
 	"github.com/johnfercher/maroto/v2/pkg/consts/fontstyle"
+	"github.com/johnfercher/maroto/v2/pkg/consts/pagesize"
 	"github.com/johnfercher/maroto/v2/pkg/core"
 	"github.com/johnfercher/maroto/v2/pkg/props"
 )
 
-// resolveKellnerName maps a kellner_id string to a human-readable name.
+// ── Colour palette ────────────────────────────────────────────────────────────
+
+var (
+	colDark   = &props.Color{Red: 30, Green: 30, Blue: 30}
+	colMid    = &props.Color{Red: 90, Green: 90, Blue: 90}
+	colLight  = &props.Color{Red: 245, Green: 245, Blue: 245}
+	colStripe = &props.Color{Red: 250, Green: 250, Blue: 250}
+	colBorder = &props.Color{Red: 220, Green: 220, Blue: 220}
+	colWhite  = &props.Color{Red: 255, Green: 255, Blue: 255}
+	colAccent = &props.Color{Red: 40, Green: 40, Blue: 40}
+)
+
+// ── Shared cell styles ────────────────────────────────────────────────────────
+
+var (
+	styleHeaderCell = &props.Cell{
+		BackgroundColor: colAccent,
+		BorderType:      border.None,
+	}
+	styleEvenCell = &props.Cell{
+		BackgroundColor: colLight,
+		BorderType:      border.None,
+	}
+	styleOddCell = &props.Cell{
+		BackgroundColor: colWhite,
+		BorderType:      border.None,
+	}
+	styleDivider = &props.Cell{
+		BackgroundColor: colBorder,
+		BorderType:      border.None,
+	}
+)
+
+// ── Text props helpers ────────────────────────────────────────────────────────
+
+func headerText(label string, a align.Type) core.Col {
+	return text.NewCol(0, label, props.Text{
+		Style: fontstyle.Bold,
+		Size:  8,
+		Align: a,
+		Color: colWhite,
+		Top:   2.5,
+	}).WithStyle(styleHeaderCell)
+}
+
+func headerTextW(width int, label string, a align.Type) core.Col {
+	return text.NewCol(width, label, props.Text{
+		Style: fontstyle.Bold,
+		Size:  8,
+		Align: a,
+		Color: colWhite,
+		Top:   2.5,
+	}).WithStyle(styleHeaderCell)
+}
+
+func cell(width int, label string, a align.Type, bold bool, style *props.Cell) core.Col {
+	fs := fontstyle.Normal
+	if bold {
+		fs = fontstyle.Bold
+	}
+	return text.NewCol(width, label, props.Text{
+		Style: fs,
+		Size:  8,
+		Align: a,
+		Top:   2,
+	}).WithStyle(style)
+}
+
+// ── Section heading ───────────────────────────────────────────────────────────
+
+func sectionTitle(m core.Maroto, title string) {
+	m.AddRows(row.New(3))
+	m.AddRows(
+		row.New(7).Add(
+			text.NewCol(12, title, props.Text{
+				Style: fontstyle.Bold,
+				Size:  9,
+				Top:   1.5,
+				Color: colMid,
+			}),
+		),
+	)
+	m.AddRows(row.New(1).Add(
+		text.NewCol(12, "", props.Text{}).WithStyle(styleDivider),
+	))
+	m.AddRows(row.New(2))
+}
+
+// ── Money formatter ───────────────────────────────────────────────────────────
+
+func eur(v float64) string {
+	return fmt.Sprintf("%.2f €", v)
+}
+
+// ── Name resolver ─────────────────────────────────────────────────────────────
+
 func resolveKellnerName(id string, userMap map[int]User) string {
 	if id == "" {
 		return "Unbekannt"
 	}
 	n, err := strconv.Atoi(id)
 	if err != nil {
-		// not a numeric ID → return as-is (e.g. legacy "bar")
 		return id
 	}
 	if u, ok := userMap[n]; ok {
@@ -35,40 +132,24 @@ func resolveKellnerName(id string, userMap map[int]User) string {
 	return id
 }
 
-// sectionHeader adds a bold section title with a horizontal rule.
-func sectionHeader(m core.Maroto, title string) {
-	m.AddRow(4)
-	m.AddRow(6,
-		text.NewCol(12, title, props.Text{Style: fontstyle.Bold, Size: 10}),
-	)
-	m.AddRow(3, line.NewCol(12, props.Line{Thickness: 0.4}))
-}
-
-// tableHeader adds a shaded header row for a table.
-func tableHeader(m core.Maroto, cols []struct {
-	label string
-	width uint
-	right bool
-}) {
-	cells := make([]core.Col, len(cols))
-	for i, c := range cols {
-		a := align.Left
-		if c.right {
-			a = align.Right
-		}
-		cells[i] = text.NewCol(int(c.width), c.label, props.Text{
-			Style: fontstyle.Bold,
-			Size:  8,
-			Align: a,
-		})
-	}
-	m.AddRow(6, cells...)
-	m.AddRow(1, line.NewCol(12, props.Line{Thickness: 0.2}))
-}
+// ── Main PDF builder ──────────────────────────────────────────────────────────
 
 func getStatsForPDF() (core.Maroto, error) {
-	m := maroto.New()
+	cfg := config.NewBuilder().
+		WithPageSize(pagesize.A4).
+		WithLeftMargin(15).
+		WithRightMargin(15).
+		WithTopMargin(15).
+		WithBottomMargin(15).
+		WithPageNumber(props.PageNumber{
+			Pattern: "{current} / {total}",
+			Place:   props.RightBottom,
+		}).
+		Build()
 
+	m := maroto.New(cfg)
+
+	// ── Load data ─────────────────────────────────────────────────────────────
 	arrRechnungen, err := getAllRechnungen(DB)
 	if err != nil {
 		return nil, err
@@ -81,8 +162,6 @@ func getStatsForPDF() (core.Maroto, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Build user lookup map for name resolution
 	allUsers, err := getAllUsers(DB)
 	if err != nil {
 		return nil, err
@@ -92,31 +171,7 @@ func getStatsForPDF() (core.Maroto, error) {
 		userMap[u.Id] = u
 	}
 
-	// ── Document header ───────────────────────────────────────────────────────
-	const iconPath = "./public/icons/icon-192x192.png"
-	iconCol := image.NewFromFileCol(1, iconPath, props.Rect{Percent: 90, Center: true})
-
-	m.AddRow(14,
-		iconCol,
-		text.NewCol(7, "HGV Bestellsystem", props.Text{
-			Style: fontstyle.Bold,
-			Size:  14,
-			Top:   2,
-		}),
-		text.NewCol(4, time.Now().Format("02.01.2006 15:04 Uhr"), props.Text{
-			Align: align.Right,
-			Size:  8,
-			Top:   5,
-		}),
-	)
-	m.AddRow(4,
-		text.NewCol(1, ""),
-		text.NewCol(11, "Event-Auswertung", props.Text{Size: 9}),
-	)
-	m.AddRow(2, line.NewCol(12, props.Line{Thickness: 0.8}))
-	m.AddRow(3)
-
-	// ── KPIs ─────────────────────────────────────────────────────────────────
+	// ── Global KPI calculations ───────────────────────────────────────────────
 	umsatzGes := 0.0
 	for _, r := range arrRechnungen {
 		umsatzGes += r.Gesamt
@@ -125,67 +180,147 @@ func getStatsForPDF() (core.Maroto, error) {
 	for _, r := range arrStorno {
 		stornoGes += r.Gesamt // negative
 	}
-
 	totalSold := 0
 	for _, r := range arrNonStorno {
-		for _, pos := range r.Positionen {
-			totalSold += pos.Amount
+		for _, p := range r.Positionen {
+			totalSold += p.Amount
 		}
 	}
 	for _, r := range arrStorno {
-		for _, pos := range r.Positionen {
-			totalSold -= pos.Amount
+		for _, p := range r.Positionen {
+			totalSold -= p.Amount
 		}
 	}
 	if totalSold < 0 {
 		totalSold = 0
 	}
-
-	// best table by revenue
-	tischMap := make(map[int]float64)
-	for _, r := range arrRechnungen {
-		tischMap[r.Tisch] += r.Gesamt
-	}
 	bestTable, bestTableRev := -1, 0.0
-	for t, rev := range tischMap {
+	tischRevMap := make(map[int]float64)
+	for _, r := range arrRechnungen {
+		tischRevMap[r.Tisch] += r.Gesamt
+	}
+	for t, rev := range tischRevMap {
 		if rev > bestTableRev {
 			bestTable, bestTableRev = t, rev
 		}
 	}
 
-	m.AddRow(6,
-		text.NewCol(3, "Umsatz (netto)", props.Text{Style: fontstyle.Bold, Size: 9}),
-		text.NewCol(3, "Storniert", props.Text{Style: fontstyle.Bold, Size: 9}),
-		text.NewCol(3, "Stärkster Tisch", props.Text{Style: fontstyle.Bold, Size: 9}),
-		text.NewCol(3, "Artikel verkauft", props.Text{Style: fontstyle.Bold, Size: 9}),
+	// ═════════════════════════════════════════════════════════════════════════
+	// HEADER
+	// ═════════════════════════════════════════════════════════════════════════
+	const iconPath = "./public/icons/icon-192x192.png"
+	m.AddRows(
+		row.New(16).Add(
+			image.NewFromFileCol(1, iconPath, props.Rect{Percent: 85, Center: true}),
+			text.NewCol(8, "HGV Bestellsystem", props.Text{
+				Style: fontstyle.Bold,
+				Size:  16,
+				Top:   3,
+				Color: colDark,
+			}),
+			text.NewCol(3, time.Now().Format("02.01.2006\n15:04 Uhr"), props.Text{
+				Align: align.Right,
+				Size:  8,
+				Top:   4,
+				Color: colMid,
+			}),
+		),
 	)
-	bestTableLabel := "–"
-	if bestTable >= 0 {
-		if bestTable == 0 {
-			bestTableLabel = fmt.Sprintf("Bar (%.2f €)", bestTableRev)
-		} else {
-			bestTableLabel = fmt.Sprintf("Tisch %d (%.2f €)", bestTable, bestTableRev)
-		}
-	}
-	m.AddRow(7,
-		text.NewCol(3, fmt.Sprintf("%.2f €", umsatzGes), props.Text{Size: 11, Style: fontstyle.Bold}),
-		text.NewCol(3, fmt.Sprintf("%.2f €", stornoGes), props.Text{Size: 11}),
-		text.NewCol(3, bestTableLabel, props.Text{Size: 9}),
-		text.NewCol(3, fmt.Sprintf("%d Stück", totalSold), props.Text{Size: 11}),
+	m.AddRows(
+		row.New(5).Add(
+			text.NewCol(1, ""),
+			text.NewCol(11, "Event-Auswertung", props.Text{
+				Size:  10,
+				Color: colMid,
+				Top:   0,
+			}),
+		),
 	)
-	m.AddRow(2,
-		text.NewCol(3, fmt.Sprintf("%d Rechnungen", len(arrNonStorno)), props.Text{Size: 7}),
-		text.NewCol(3, fmt.Sprintf("%d Stornos", len(arrStorno)), props.Text{Size: 7}),
-		text.NewCol(6, ""),
-	)
-	m.AddRow(5)
+	// thick separator
+	m.AddRows(row.New(1).Add(
+		text.NewCol(12, "").WithStyle(&props.Cell{BackgroundColor: colDark, BorderType: border.None}),
+	))
+	m.AddRows(row.New(4))
 
-	// ── Kellner / Account Übersicht ───────────────────────────────────────────
+	// ═════════════════════════════════════════════════════════════════════════
+	// KPI BOXES  (4 nebeneinander mit dunklem Hintergrund)
+	// ═════════════════════════════════════════════════════════════════════════
+	bestTableLabel := "–"
+	if bestTable == 0 {
+		bestTableLabel = fmt.Sprintf("Bar")
+	} else if bestTable > 0 {
+		bestTableLabel = fmt.Sprintf("Tisch %d", bestTable)
+	}
+
+	kpiBox := &props.Cell{BackgroundColor: colLight, BorderType: border.None}
+
+	kpiLabel := func(w int, label string) core.Col {
+		return text.NewCol(w, label, props.Text{
+			Size:  7,
+			Style: fontstyle.Bold,
+			Color: colMid,
+			Top:   2.5,
+			Align: align.Center,
+		}).WithStyle(kpiBox)
+	}
+	kpiValue := func(w int, val string) core.Col {
+		return text.NewCol(w, val, props.Text{
+			Size:  13,
+			Style: fontstyle.Bold,
+			Color: colDark,
+			Top:   1,
+			Align: align.Center,
+		}).WithStyle(kpiBox)
+	}
+	kpiSub := func(w int, sub string) core.Col {
+		return text.NewCol(w, sub, props.Text{
+			Size:  7,
+			Color: colMid,
+			Top:   1,
+			Align: align.Center,
+		}).WithStyle(kpiBox)
+	}
+	spacer := func() core.Col {
+		return text.NewCol(1, "").WithStyle(&props.Cell{BackgroundColor: colWhite, BorderType: border.None})
+	}
+
+	m.AddRows(row.New(5).Add(
+		kpiLabel(3, "UMSATZ (NETTO)"),
+		spacer(),
+		kpiLabel(3, "STORNIERT"),
+		spacer(),
+		kpiLabel(3, "STÄRKSTER TISCH"),
+		spacer(),
+		kpiLabel(3, "ARTIKEL VERKAUFT"),
+	))
+	m.AddRows(row.New(8).Add(
+		kpiValue(3, eur(umsatzGes)),
+		spacer(),
+		kpiValue(3, eur(-stornoGes)),
+		spacer(),
+		kpiValue(3, bestTableLabel),
+		spacer(),
+		kpiValue(3, fmt.Sprintf("%d", totalSold)),
+	))
+	m.AddRows(row.New(5).Add(
+		kpiSub(3, fmt.Sprintf("%d Rechnungen", len(arrNonStorno))),
+		spacer(),
+		kpiSub(3, fmt.Sprintf("%d Stornos", len(arrStorno))),
+		spacer(),
+		kpiSub(3, eur(bestTableRev)),
+		spacer(),
+		kpiSub(3, "Stück (netto)"),
+	))
+	m.AddRows(row.New(6))
+
+	// ═════════════════════════════════════════════════════════════════════════
+	// KELLNER / ACCOUNTS
+	// ═════════════════════════════════════════════════════════════════════════
 	type kellnerStat struct {
-		name    string
-		umsatz  float64
-		storni  float64
-		count   int
+		name   string
+		umsatz float64
+		storni float64
+		count  int
 	}
 	kellnerMap := make(map[string]*kellnerStat)
 	for _, r := range arrRechnungen {
@@ -204,104 +339,108 @@ func getStatsForPDF() (core.Maroto, error) {
 			s.storni += -r.Gesamt
 		}
 	}
-	if len(kellnerMap) > 0 {
-		sectionHeader(m, "Kellner / Accounts")
-		tableHeader(m, []struct {
-			label string
-			width uint
-			right bool
-		}{
-			{"Name", 5, false},
-			{"Rechnungen", 3, true},
-			{"Storno", 2, true},
-			{"Umsatz", 2, true},
-		})
 
-		type ks struct {
-			id string
-			*kellnerStat
-		}
+	if len(kellnerMap) > 0 {
+		type ks struct{ *kellnerStat }
 		var kSlice []ks
-		for id, s := range kellnerMap {
-			kSlice = append(kSlice, ks{id, s})
+		for _, s := range kellnerMap {
+			kSlice = append(kSlice, ks{s})
 		}
 		sort.Slice(kSlice, func(i, j int) bool { return kSlice[i].umsatz > kSlice[j].umsatz })
-		for _, k := range kSlice {
+
+		sectionTitle(m, "KELLNER / ACCOUNTS")
+
+		// header row
+		m.AddRows(row.New(7).Add(
+			headerTextW(5, "Name", align.Left),
+			headerTextW(2, "Rechnungen", align.Center),
+			headerTextW(2, "Stornos", align.Right),
+			headerTextW(3, "Umsatz", align.Right),
+		))
+
+		for i, k := range kSlice {
+			st := styleOddCell
+			if i%2 == 0 {
+				st = styleEvenCell
+			}
 			stornoStr := "–"
 			if k.storni > 0 {
-				stornoStr = fmt.Sprintf("-%.2f €", k.storni)
+				stornoStr = "-" + eur(k.storni)
 			}
-			m.AddRow(5,
-				text.NewCol(5, k.name, props.Text{Size: 8}),
-				text.NewCol(3, fmt.Sprintf("%d", k.count), props.Text{Size: 8, Align: align.Right}),
-				text.NewCol(2, stornoStr, props.Text{Size: 8, Align: align.Right}),
-				text.NewCol(2, fmt.Sprintf("%.2f €", k.umsatz), props.Text{Size: 8, Align: align.Right, Style: fontstyle.Bold}),
-			)
+			m.AddRows(row.New(6).Add(
+				cell(5, k.name, align.Left, false, st),
+				cell(2, fmt.Sprintf("%d", k.count), align.Center, false, st),
+				cell(2, stornoStr, align.Right, false, st),
+				cell(3, eur(k.umsatz), align.Right, true, st),
+			))
 		}
-		m.AddRow(5)
 	}
 
-	// ── Tische ────────────────────────────────────────────────────────────────
-	if len(tischMap) > 0 {
-		type tischStat struct {
-			tisch   int
-			revenue float64
-			count   int
-		}
+	// ═════════════════════════════════════════════════════════════════════════
+	// TISCHE
+	// ═════════════════════════════════════════════════════════════════════════
+	if len(tischRevMap) > 0 {
 		tischCountMap := make(map[int]int)
 		for _, r := range arrNonStorno {
 			tischCountMap[r.Tisch]++
 		}
-		var tischSlice []tischStat
-		for t, rev := range tischMap {
-			tischSlice = append(tischSlice, tischStat{t, rev, tischCountMap[t]})
+		type tischEntry struct {
+			tisch   int
+			revenue float64
+			count   int
 		}
-		sort.Slice(tischSlice, func(i, j int) bool { return tischSlice[i].revenue > tischSlice[j].revenue })
+		var tSlice []tischEntry
+		for t, rev := range tischRevMap {
+			tSlice = append(tSlice, tischEntry{t, rev, tischCountMap[t]})
+		}
+		sort.Slice(tSlice, func(i, j int) bool { return tSlice[i].revenue > tSlice[j].revenue })
 
-		sectionHeader(m, "Tische")
-		tableHeader(m, []struct {
-			label string
-			width uint
-			right bool
-		}{
-			{"Tisch", 4, false},
-			{"Bestellungen", 4, true},
-			{"Umsatz", 4, true},
-		})
-		for _, t := range tischSlice {
+		sectionTitle(m, "TISCHE")
+
+		m.AddRows(row.New(7).Add(
+			headerTextW(6, "Tisch", align.Left),
+			headerTextW(3, "Bestellungen", align.Center),
+			headerTextW(3, "Umsatz", align.Right),
+		))
+
+		for i, t := range tSlice {
+			st := styleOddCell
+			if i%2 == 0 {
+				st = styleEvenCell
+			}
 			label := fmt.Sprintf("Tisch %d", t.tisch)
 			if t.tisch == 0 {
 				label = "Bar"
 			}
-			m.AddRow(5,
-				text.NewCol(4, label, props.Text{Size: 8}),
-				text.NewCol(4, fmt.Sprintf("%d", t.count), props.Text{Size: 8, Align: align.Right}),
-				text.NewCol(4, fmt.Sprintf("%.2f €", t.revenue), props.Text{Size: 8, Align: align.Right, Style: fontstyle.Bold}),
-			)
+			m.AddRows(row.New(6).Add(
+				cell(6, label, align.Left, false, st),
+				cell(3, fmt.Sprintf("%d", t.count), align.Center, false, st),
+				cell(3, eur(t.revenue), align.Right, true, st),
+			))
 		}
-		m.AddRow(5)
 	}
 
-	// ── Kategorien ────────────────────────────────────────────────────────────
+	// ═════════════════════════════════════════════════════════════════════════
+	// KATEGORIEN
+	// ═════════════════════════════════════════════════════════════════════════
 	type katData struct {
-		name         string
-		sold         int
-		revenue      float64
-		stornoSold   int
-		stornoRev    float64
+		name      string
+		sold      int
+		revenue   float64
+		stornoRev float64
 	}
-	katMap := make(map[string]*katData)
+	katMap2 := make(map[string]*katData)
 	for _, r := range arrNonStorno {
 		for _, pos := range r.Positionen {
 			k := pos.Kategorie
 			if k == "" {
 				k = "Sonstiges"
 			}
-			if katMap[k] == nil {
-				katMap[k] = &katData{name: k}
+			if katMap2[k] == nil {
+				katMap2[k] = &katData{name: k}
 			}
-			katMap[k].sold += pos.Amount
-			katMap[k].revenue += pos.Price * float64(pos.Amount)
+			katMap2[k].sold += pos.Amount
+			katMap2[k].revenue += pos.Price * float64(pos.Amount)
 		}
 	}
 	for _, r := range arrStorno {
@@ -310,59 +449,58 @@ func getStatsForPDF() (core.Maroto, error) {
 			if k == "" {
 				k = "Sonstiges"
 			}
-			if katMap[k] == nil {
-				katMap[k] = &katData{name: k}
+			if katMap2[k] == nil {
+				katMap2[k] = &katData{name: k}
 			}
-			katMap[k].stornoSold += pos.Amount
-			katMap[k].stornoRev += pos.Price * float64(pos.Amount)
+			katMap2[k].stornoRev += pos.Price * float64(pos.Amount)
 		}
 	}
-
-	type katEntry struct{ *katData }
-	var katSlice []katEntry
-	for _, kd := range katMap {
-		katSlice = append(katSlice, katEntry{kd})
+	var katSlice []*katData
+	for _, kd := range katMap2 {
+		katSlice = append(katSlice, kd)
 	}
 	sort.Slice(katSlice, func(i, j int) bool {
 		return (katSlice[i].revenue - katSlice[i].stornoRev) > (katSlice[j].revenue - katSlice[j].stornoRev)
 	})
 
 	if len(katSlice) > 0 {
-		sectionHeader(m, "Kategorien")
-		tableHeader(m, []struct {
-			label string
-			width uint
-			right bool
-		}{
-			{"Kategorie", 5, false},
-			{"Stück (netto)", 3, true},
-			{"Storno", 2, true},
-			{"Umsatz (netto)", 2, true},
-		})
-		for _, k := range katSlice {
+		sectionTitle(m, "KATEGORIEN")
+
+		m.AddRows(row.New(7).Add(
+			headerTextW(5, "Kategorie", align.Left),
+			headerTextW(2, "Stück (netto)", align.Center),
+			headerTextW(2, "Storno", align.Right),
+			headerTextW(3, "Umsatz (netto)", align.Right),
+		))
+
+		for i, k := range katSlice {
+			st := styleOddCell
+			if i%2 == 0 {
+				st = styleEvenCell
+			}
 			net := k.revenue - k.stornoRev
-			netSold := k.sold - k.stornoSold
 			stornoStr := "–"
 			if k.stornoRev > 0 {
-				stornoStr = fmt.Sprintf("-%.2f €", k.stornoRev)
+				stornoStr = "-" + eur(k.stornoRev)
 			}
-			m.AddRow(5,
-				text.NewCol(5, k.name, props.Text{Size: 8}),
-				text.NewCol(3, fmt.Sprintf("%d", netSold), props.Text{Size: 8, Align: align.Right}),
-				text.NewCol(2, stornoStr, props.Text{Size: 8, Align: align.Right}),
-				text.NewCol(2, fmt.Sprintf("%.2f €", net), props.Text{Size: 8, Align: align.Right, Style: fontstyle.Bold}),
-			)
+			m.AddRows(row.New(6).Add(
+				cell(5, k.name, align.Left, false, st),
+				cell(2, fmt.Sprintf("%d", k.sold), align.Center, false, st),
+				cell(2, stornoStr, align.Right, false, st),
+				cell(3, eur(net), align.Right, true, st),
+			))
 		}
-		m.AddRow(5)
 	}
 
-	// ── Artikel pro Kategorie ─────────────────────────────────────────────────
+	// ═════════════════════════════════════════════════════════════════════════
+	// ARTIKEL PRO KATEGORIE
+	// ═════════════════════════════════════════════════════════════════════════
 	type artikelInfo struct {
-		name   string
-		sold   int
+		name    string
+		sold    int
 		revenue float64
 	}
-	produktMap := make(map[string]map[string]*artikelInfo) // kat → name → info
+	produktMap := make(map[string]map[string]*artikelInfo)
 	for _, r := range arrNonStorno {
 		for _, pos := range r.Positionen {
 			k := pos.Kategorie
@@ -396,8 +534,6 @@ func getStatsForPDF() (core.Maroto, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Build ordered category list (DB order + any extra from orders)
 	orderedKats := make([]string, 0)
 	seen := make(map[string]bool)
 	for _, cat := range Kategorien {
@@ -412,8 +548,17 @@ func getStatsForPDF() (core.Maroto, error) {
 		}
 	}
 
-	if len(orderedKats) > 0 {
-		sectionHeader(m, "Artikel pro Kategorie")
+	hasArtikel := false
+	for _, katName := range orderedKats {
+		if len(produktMap[katName]) > 0 {
+			hasArtikel = true
+			break
+		}
+	}
+
+	if hasArtikel {
+		sectionTitle(m, "ARTIKEL PRO KATEGORIE")
+
 		for _, katName := range orderedKats {
 			prods := produktMap[katName]
 			if len(prods) == 0 {
@@ -430,28 +575,56 @@ func getStatsForPDF() (core.Maroto, error) {
 			}
 			sort.Slice(aSlice, func(i, j int) bool { return aSlice[i].revenue > aSlice[j].revenue })
 
-			m.AddRow(6,
-				text.NewCol(12, katName, props.Text{Style: fontstyle.Bold, Size: 8}),
-			)
-			for _, a := range aSlice {
-				m.AddRow(5,
-					text.NewCol(1, ""),
-					text.NewCol(7, a.name, props.Text{Size: 8}),
-					text.NewCol(2, fmt.Sprintf("%dx", a.sold), props.Text{Size: 8, Align: align.Right}),
-					text.NewCol(2, fmt.Sprintf("%.2f €", a.revenue), props.Text{Size: 8, Align: align.Right}),
-				)
+			// category sub-header
+			m.AddRows(row.New(6).Add(
+				text.NewCol(12, katName, props.Text{
+					Style: fontstyle.Bold,
+					Size:  8,
+					Color: colMid,
+					Top:   1.5,
+				}).WithStyle(&props.Cell{
+					BackgroundColor: colStripe,
+					BorderType:      border.None,
+				}),
+			))
+
+			for i, a := range aSlice {
+				st := styleOddCell
+				if i%2 == 0 {
+					st = styleEvenCell
+				}
+				m.AddRows(row.New(6).Add(
+					text.NewCol(1, "", props.Text{}).WithStyle(st),
+					cell(7, a.name, align.Left, false, st),
+					cell(2, fmt.Sprintf("%d×", a.sold), align.Right, false, st),
+					cell(2, eur(a.revenue), align.Right, true, st),
+				))
 			}
-			m.AddRow(3)
+			m.AddRows(row.New(3))
 		}
 	}
 
-	// ── Footer ────────────────────────────────────────────────────────────────
-	m.AddRow(5)
-	m.AddRow(2, line.NewCol(12, props.Line{Thickness: 0.4}))
-	m.AddRow(5,
-		text.NewCol(12, fmt.Sprintf("Erstellt am %s", time.Now().Format("02.01.2006 um 15:04 Uhr")),
-			props.Text{Size: 7, Align: align.Center}),
-	)
+	// ═════════════════════════════════════════════════════════════════════════
+	// FOOTER
+	// ═════════════════════════════════════════════════════════════════════════
+	m.AddRows(row.New(6))
+	m.AddRows(row.New(1).Add(
+		text.NewCol(12, "").WithStyle(&props.Cell{BackgroundColor: colBorder, BorderType: border.None}),
+	))
+	m.AddRows(row.New(5).Add(
+		text.NewCol(6, "HGV Bestellsystem", props.Text{
+			Size:  7,
+			Color: colMid,
+			Top:   1,
+		}),
+		text.NewCol(6, fmt.Sprintf("Erstellt am %s", time.Now().Format("02.01.2006 um 15:04 Uhr")), props.Text{
+			Size:  7,
+			Color: colMid,
+			Align: align.Right,
+			Top:   1,
+		}),
+	))
 
 	return m, nil
 }
+
