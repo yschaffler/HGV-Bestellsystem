@@ -86,9 +86,30 @@ func td(width int, label string, a align.Type, bold bool, even bool) core.Col {
 	}).WithStyle(st)
 }
 
-// ── Money ─────────────────────────────────────────────────────────────────────
+// ── Money (German format: 1.234,56 €) ────────────────────────────────────────
 
-func eur(v float64) string { return fmt.Sprintf("%.2f €", v) }
+func eur(v float64) string {
+	negative := v < 0
+	if negative {
+		v = -v
+	}
+	whole := int64(v)
+	frac := int(v*100+0.5) % 100
+	// insert thousand separators
+	s := fmt.Sprintf("%d", whole)
+	out := ""
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out += "."
+		}
+		out += string(c)
+	}
+	result := fmt.Sprintf("%s,%02d €", out, frac)
+	if negative {
+		return "-" + result
+	}
+	return result
+}
 
 // ── Name resolution ───────────────────────────────────────────────────────────
 
@@ -236,46 +257,93 @@ func getStatsForPDF() (core.Maroto, error) {
 		bestLabel = fmt.Sprintf("Tisch %d", bestTable)
 	}
 
-	kpiTxt := func(w int, s string, size float64, bold bool, top float64) core.Col {
-		fs := fontstyle.Normal
-		if bold {
-			fs = fontstyle.Bold
-		}
-		return text.NewCol(w, s, props.Text{
-			Style: fs, Size: size, Align: align.Center,
-			Color: cDark, Top: top,
-		}).WithStyle(styleKpi())
+	// Thick top-accent + light bg for the entire KPI block
+	styleKpiAccent := &props.Cell{
+		BackgroundColor: cDark,
+		BorderType:      border.None,
 	}
-	kpiSub := func(w int, s string) core.Col {
-		return text.NewCol(w, s, props.Text{
-			Size: 7, Align: align.Center, Color: cGray, Top: 1.5,
-		}).WithStyle(styleKpi())
+	styleKpiBg := &props.Cell{
+		BackgroundColor: cLight,
+		BorderType:      border.None,
 	}
-	kpiLabel := func(w int, s string) core.Col {
-		return text.NewCol(w, s, props.Text{
-			Style: fontstyle.Bold, Size: 7,
-			Align: align.Center, Color: cGray, Top: 2.5,
-		}).WithStyle(styleKpi())
+	// 1-unit gap column between cards (white)
+	styleGap := &props.Cell{
+		BackgroundColor: cAlt,
+		BorderType:      border.None,
+	}
+	gap := func() core.Col {
+		return text.NewCol(1, "").WithStyle(styleGap)
+	}
+	// col widths: 3+0+3+0+3+0+3 would be 12 — but we use
+	//   card(3) gap(0) ... not possible with int.
+	// Instead: card=2, gap=1 → 2+1+2+1+2+1+2+1 = 12  (but cards only 2 wide)
+	// Or keep card=3 and put border-right only on each card.
+	// Best approach: use cards of width 3, no gaps, but add right border for separation.
+	styleSepRight := &props.Cell{
+		BackgroundColor: cLight,
+		BorderType:      border.Right,
+		BorderColor:     cBorder,
+		BorderThickness: 0.5,
 	}
 
-	// 3+3+3+3 = 12 ✓
-	m.AddRows(row.New(5).Add(
-		kpiLabel(3, "UMSATZ (NETTO)"),
-		kpiLabel(3, "STORNIERT"),
-		kpiLabel(3, "STÄRKSTER TISCH"),
-		kpiLabel(3, "ARTIKEL"),
+	kpiLabelCol := func(w int, s string, sepRight bool) core.Col {
+		st := styleKpiBg
+		if sepRight {
+			st = styleSepRight
+		}
+		return text.NewCol(w, s, props.Text{
+			Style: fontstyle.Bold, Size: 7,
+			Align: align.Center, Color: cGray, Top: 3,
+		}).WithStyle(st)
+	}
+	kpiValueCol := func(w int, s string, sepRight bool) core.Col {
+		st := styleKpiBg
+		if sepRight {
+			st = styleSepRight
+		}
+		return text.NewCol(w, s, props.Text{
+			Style: fontstyle.Bold, Size: 13,
+			Align: align.Center, Color: cDark, Top: 2,
+		}).WithStyle(st)
+	}
+	kpiSubCol := func(w int, s string, sepRight bool) core.Col {
+		st := styleKpiBg
+		if sepRight {
+			st = styleSepRight
+		}
+		return text.NewCol(w, s, props.Text{
+			Size: 7, Align: align.Center, Color: cGray, Top: 1.5,
+		}).WithStyle(st)
+	}
+	_ = gap // suppress unused warning
+
+	// Top accent bar: thin dark strip = 3+3+3+3 = 12 ✓
+	m.AddRows(row.New(2).Add(
+		text.NewCol(3, "").WithStyle(styleKpiAccent),
+		text.NewCol(3, "").WithStyle(styleKpiAccent),
+		text.NewCol(3, "").WithStyle(styleKpiAccent),
+		text.NewCol(3, "").WithStyle(styleKpiAccent),
 	))
-	m.AddRows(row.New(8).Add(
-		kpiTxt(3, eur(totalRevenue), 12, true, 1.5),
-		kpiTxt(3, eur(-totalStorno), 12, true, 1.5),
-		kpiTxt(3, bestLabel, 12, true, 1.5),
-		kpiTxt(3, fmt.Sprintf("%d", totalItems), 12, true, 1.5),
+	// label row: 3+3+3+3 = 12 ✓
+	m.AddRows(row.New(6).Add(
+		kpiLabelCol(3, "UMSATZ (NETTO)", true),
+		kpiLabelCol(3, "STORNIERT", true),
+		kpiLabelCol(3, "STÄRKSTER TISCH", true),
+		kpiLabelCol(3, "ARTIKEL", false),
 	))
-	m.AddRows(row.New(5).Add(
-		kpiSub(3, fmt.Sprintf("%d Rechnungen", len(arrNonStorno))),
-		kpiSub(3, fmt.Sprintf("%d Stornos", len(arrStorno))),
-		kpiSub(3, eur(bestRev)),
-		kpiSub(3, "Stück (netto)"),
+	// value row: 3+3+3+3 = 12 ✓
+	m.AddRows(row.New(10).Add(
+		kpiValueCol(3, eur(totalRevenue), true),
+		kpiValueCol(3, eur(-totalStorno), true),
+		kpiValueCol(3, bestLabel, true),
+		kpiValueCol(3, fmt.Sprintf("%d", totalItems), false),
+	))
+	// sub row: 3+3+3+3 = 12 ✓
+	m.AddRows(row.New(6).Add(
+		kpiSubCol(3, fmt.Sprintf("%d Rechnungen", len(arrNonStorno)), true),
+		kpiSubCol(3, fmt.Sprintf("%d Stornos", len(arrStorno)), true),
+		kpiSubCol(3, eur(bestRev), true),
+		kpiSubCol(3, "Stück (netto)", false),
 	))
 
 	// ═════════════════════════════════════════════════════════════════════════
