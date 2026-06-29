@@ -78,6 +78,7 @@ type PrinterRule struct {
 	TableFrom  *int     `json:"tableFrom"`
 	TableTo    *int     `json:"tableTo"`
 	Categories []string `json:"categories"`
+	AccountId  string   `json:"accountId"` // optional: only match orders from this kellner_id
 }
 
 // PrinterSettingsConfig is the full printer configuration stored in the DB.
