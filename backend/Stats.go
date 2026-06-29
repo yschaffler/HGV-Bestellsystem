@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/johnfercher/maroto/v2"
+	"github.com/johnfercher/maroto/v2/pkg/components/image"
 	"github.com/johnfercher/maroto/v2/pkg/components/line"
 	"github.com/johnfercher/maroto/v2/pkg/components/text"
 	"github.com/johnfercher/maroto/v2/pkg/consts/align"
@@ -92,9 +93,25 @@ func getStatsForPDF() (core.Maroto, error) {
 	}
 
 	// ── Document header ───────────────────────────────────────────────────────
-	m.AddRow(10,
-		text.NewCol(8, "Event-Auswertung", props.Text{Style: fontstyle.Bold, Size: 14}),
-		text.NewCol(4, time.Now().Format("02.01.2006 15:04"), props.Text{Align: align.Right, Size: 9}),
+	const iconPath = "./public/icons/icon-192x192.png"
+	iconCol := image.NewFromFileCol(1, iconPath, props.Rect{Percent: 90, Center: true})
+
+	m.AddRow(14,
+		iconCol,
+		text.NewCol(7, "HGV Bestellsystem", props.Text{
+			Style: fontstyle.Bold,
+			Size:  14,
+			Top:   2,
+		}),
+		text.NewCol(4, time.Now().Format("02.01.2006 15:04 Uhr"), props.Text{
+			Align: align.Right,
+			Size:  8,
+			Top:   5,
+		}),
+	)
+	m.AddRow(4,
+		text.NewCol(1, ""),
+		text.NewCol(11, "Event-Auswertung", props.Text{Size: 9}),
 	)
 	m.AddRow(2, line.NewCol(12, props.Line{Thickness: 0.8}))
 	m.AddRow(3)
