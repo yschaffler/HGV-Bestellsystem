@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Tag,
   TableProperties,
+  FileDown,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -32,6 +33,13 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type ApiUser = {
+  user_id: number;
+  user_username: string;
+  user_realname: string;
+  user_role: string;
+};
 
 type RechnungPosition = {
   product_id: number;
@@ -113,6 +121,7 @@ function KpiCard({
 export default function StatistikPage() {
   const router = useRouter();
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
+  const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
@@ -131,26 +140,48 @@ export default function StatistikPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
-    loadRechnungen();
+    loadData();
   }, []);
 
-  async function loadRechnungen() {
+  async function loadData() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/admin/rechnungen/");
-      if (res.status === 403) {
+      const [rechnRes, usersRes] = await Promise.all([
+        fetch("/admin/rechnungen/"),
+        fetch("/get/all-users/"),
+      ]);
+      if (rechnRes.status === 403) {
         router.push("/");
         return;
       }
-      if (!res.ok) throw new Error();
-      const data: Rechnung[] = await res.json();
+      if (!rechnRes.ok) throw new Error();
+      const data: Rechnung[] = await rechnRes.json();
       setRechnungen(data);
+      if (usersRes.ok) {
+        const users: ApiUser[] = await usersRes.json();
+        const m = new Map<string, string>();
+        for (const u of users) {
+          m.set(String(u.user_id), u.user_realname || u.user_username);
+        }
+        setUserMap(m);
+      }
     } catch {
       setError("Daten konnten nicht geladen werden.");
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function resolveKellnerName(id: string): string {
+    if (!id) return "Unbekannt";
+    const resolved = userMap.get(id);
+    if (resolved) return resolved;
+    return id; // fallback: raw value (e.g. legacy "bar")
+  }
+
+  async function loadRechnungen() {
+    await loadData();
   }
 
   async function handleReset() {
@@ -199,14 +230,15 @@ export default function StatistikPage() {
       const k = r.rechnung_kellner_id || "Unbekannt";
       if (!map.has(k)) map.set(k, { umsatz: 0, storni: 0, count: 0 });
       const s = map.get(k)!;
-      s.umsatz += r.rechnung_gesamt; // STORNO already negative, so sum = net
+      s.umsatz += r.rechnung_gesamt;
       if (r.rechnung_typ === "RECHNUNG") s.count++;
       else s.storni += Math.abs(r.rechnung_gesamt);
     }
     return Array.from(map.entries())
-      .map(([name, s]) => ({ name, ...s }))
+      .map(([id, s]) => ({ id, name: resolveKellnerName(id), ...s }))
       .sort((a, b) => b.umsatz - a.umsatz);
-  }, [rechnungen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rechnungen, userMap]);
 
   // ── Per-table ──────────────────────────────────────────────────────────────
 
@@ -330,8 +362,11 @@ export default function StatistikPage() {
     rechnungen.forEach((r) => {
       if (r.rechnung_kellner_id) set.add(r.rechnung_kellner_id);
     });
-    return Array.from(set).sort();
-  }, [rechnungen]);
+    return Array.from(set)
+      .sort()
+      .map((id) => ({ id, name: resolveKellnerName(id) }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rechnungen, userMap]);
 
   // ── Filtered invoice list ──────────────────────────────────────────────────
 
@@ -375,6 +410,11 @@ export default function StatistikPage() {
         <Button variant="outline" size="sm" className="text-xs gap-1" onClick={loadRechnungen}>
           <RefreshCcw className="w-3 h-3" /> Aktualisieren
         </Button>
+        <a href="/get/statistics-pdf/" target="_blank" rel="noopener noreferrer">
+          <Button variant="default" size="sm" className="text-xs gap-1">
+            <FileDown className="w-3 h-3" /> PDF
+          </Button>
+        </a>
       </div>
 
       {error && (
@@ -667,8 +707,8 @@ export default function StatistikPage() {
               >
                 <option value="alle">Alle Kellner</option>
                 {uniqueKellner.map((k) => (
-                  <option key={k} value={k}>
-                    {k}
+                  <option key={k.id} value={k.id}>
+                    {k.name}
                   </option>
                 ))}
               </select>
@@ -743,7 +783,7 @@ export default function StatistikPage() {
                             </p>
                             <p className="text-muted-foreground text-xs truncate">
                               {fmtDateTime(r.rechnung_erstellt_am)}
-                              {r.rechnung_kellner_id ? ` · ${r.rechnung_kellner_id}` : ""}
+                              {r.rechnung_kellner_id ? ` · ${resolveKellnerName(r.rechnung_kellner_id)}` : ""}
                             </p>
                           </div>
                           <div className="text-right shrink-0">

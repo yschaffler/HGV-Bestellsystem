@@ -4,6 +4,7 @@ export type PrinterRule = {
   tableFrom: number | null;  // null = no lower table bound
   tableTo: number | null;    // null = no upper table bound
   categories: string[];       // empty = all categories
+  accountId: string;          // empty = all accounts
 };
 
 export type PrinterSettings = {
@@ -13,7 +14,7 @@ export type PrinterSettings = {
 
 export const DEFAULT_SETTINGS: PrinterSettings = {
   printBarOrders: true,
-  rules: [{ id: "1", barName: "Bar 1", tableFrom: null, tableTo: null, categories: [] }],
+  rules: [{ id: "1", barName: "Bar 1", tableFrom: null, tableTo: null, categories: [], accountId: "" }],
 };
 
 export async function fetchPrinterSettings(): Promise<PrinterSettings> {
@@ -28,6 +29,7 @@ export async function fetchPrinterSettings(): Promise<PrinterSettings> {
       rules: (data.rules ?? []).map((r: PrinterRule) => ({
         ...r,
         categories: r.categories ?? [],
+        accountId: r.accountId ?? "",
       })),
     };
   } catch {

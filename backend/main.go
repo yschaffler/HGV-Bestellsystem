@@ -502,12 +502,15 @@ func requireAdmin(r *http.Request) bool {
 
 // findPrinterForItem returns the first matching printer name for an item,
 // or "" if no rule matches.
-func findPrinterForItem(pos RechnungPosition, table int, settings PrinterSettingsConfig) string {
+func findPrinterForItem(pos RechnungPosition, table int, kellnerId string, settings PrinterSettingsConfig) string {
 	for _, rule := range settings.Rules {
 		if rule.TableFrom != nil && table < *rule.TableFrom {
 			continue
 		}
 		if rule.TableTo != nil && table > *rule.TableTo {
+			continue
+		}
+		if rule.AccountId != "" && rule.AccountId != kellnerId {
 			continue
 		}
 		if len(rule.Categories) > 0 {
@@ -550,7 +553,7 @@ func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, o
 	seen := make(map[string]bool)
 
 	for _, pos := range req.Positionen {
-		printer := findPrinterForItem(pos, req.Tisch, settings)
+		printer := findPrinterForItem(pos, req.Tisch, req.KellnerId, settings)
 		if printer == "" {
 			continue
 		}

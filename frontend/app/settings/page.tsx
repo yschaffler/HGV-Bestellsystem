@@ -56,8 +56,8 @@ export default function Settingspage() {
   const [collapsed, setCollapsed] = useState({ produkte: true, kategorien: true, nutzer: true, drucker: true, queues: true });
 
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
-  const [newRule, setNewRule] = useState<{ barName: string; tableFrom: string; tableTo: string; categories: string[] }>(
-    { barName: "", tableFrom: "", tableTo: "", categories: [] }
+  const [newRule, setNewRule] = useState<{ barName: string; tableFrom: string; tableTo: string; categories: string[]; accountId: string }>(
+    { barName: "", tableFrom: "", tableTo: "", categories: [], accountId: "" }
   );
 
   useEffect(() => {
@@ -103,9 +103,10 @@ export default function Settingspage() {
       tableFrom,
       tableTo,
       categories: newRule.categories,
+      accountId: newRule.accountId,
     };
     updatePrinter({ ...printerSettings, rules: [...printerSettings.rules, rule] });
-    setNewRule({ barName: "", tableFrom: "", tableTo: "", categories: [] });
+    setNewRule({ barName: "", tableFrom: "", tableTo: "", categories: [], accountId: "" });
   }
 
   function deleteRule(id: string) {
@@ -546,6 +547,8 @@ export default function Settingspage() {
                       const catLabel = (rule.categories ?? []).length > 0
                         ? rule.categories.join(", ")
                         : "Alle Kategorien";
+                      const accountUser = rule.accountId ? users.find(u => u.id === rule.accountId) : null;
+                      const accountLabel = accountUser ? accountUser.username : null;
                       return (
                         <div key={rule.id} className="flex items-start gap-2 bg-muted/20 border rounded-xl px-3 py-2.5">
                           <div className="flex-1 min-w-0">
@@ -556,6 +559,11 @@ export default function Settingspage() {
                             <div className="flex flex-wrap gap-1.5 mt-1.5">
                               <span className="text-xs bg-background border rounded-md px-2 py-0.5 text-muted-foreground">{tableLabel}</span>
                               <span className="text-xs bg-background border rounded-md px-2 py-0.5 text-muted-foreground">{catLabel}</span>
+                              {accountLabel && (
+                                <span className="text-xs bg-primary/10 border border-primary/20 rounded-md px-2 py-0.5 text-primary font-medium">
+                                  Account: {accountLabel}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <button
@@ -606,6 +614,21 @@ export default function Settingspage() {
                           className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors"
                         />
                       </div>
+                    </div>
+
+                    {/* Account filter */}
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Account <span className="opacity-60">(leer = alle Accounts)</span></label>
+                      <select
+                        value={newRule.accountId}
+                        onChange={e => setNewRule(r => ({ ...r, accountId: e.target.value }))}
+                        className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors"
+                      >
+                        <option value="">Alle Accounts</option>
+                        {users.filter(u => u.role === "BAR" || u.role === "KELLNER").map(u => (
+                          <option key={u.id} value={u.id}>{u.username}</option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Category filter */}

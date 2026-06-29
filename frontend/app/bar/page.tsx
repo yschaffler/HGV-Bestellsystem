@@ -30,6 +30,7 @@ export default function BarPage() {
   const [productsList, setProductsList] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>(["Alle"]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string>("bar");
 
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -37,9 +38,16 @@ export default function BarPage() {
     async function loadData() {
       try {
         // Backend URLs are relative since they're served by the same Go server
-        const catRes = await fetch("/get/all-categories/");
-        const prodRes = await fetch("/get/all-products/");
+        const [catRes, prodRes, meRes] = await Promise.all([
+          fetch("/get/all-categories/"),
+          fetch("/get/all-products/"),
+          fetch("/me/", { credentials: "include" }),
+        ]);
         if (!catRes.ok || !prodRes.ok) throw new Error("Failed to fetch");
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData.user_id) setCurrentUserId(String(meData.user_id));
+        }
 
         const catData: ApiCategory[] = await catRes.json();
         const prodData: ApiProduct[] = await prodRes.json();
@@ -124,7 +132,7 @@ export default function BarPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tisch: 0,
-          kellner_id: "bar",
+          kellner_id: currentUserId,
           typ: "RECHNUNG",
           gesamt: totalAmount,
           positionen: cart.map((item) => ({
