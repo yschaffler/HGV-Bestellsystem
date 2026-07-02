@@ -640,7 +640,7 @@ export default function Settingspage() {
                         className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors"
                       >
                         <option value="">Alle Accounts</option>
-                        {users.filter(u => u.role === "BAR" || u.role === "KELLNER").map(u => (
+                        {users.map(u => (
                           <option key={u.id} value={u.id}>{u.username}</option>
                         ))}
                       </select>
