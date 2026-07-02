@@ -267,6 +267,7 @@ export default function Settingspage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_username: u.username, user_password: u.password, user_role: u.role })
       });
+      if (res.status === 409) { setError("Benutzername bereits vergeben"); return; }
       if (!res.ok) throw new Error();
       await fetchUsers();
     } catch { setError("Fehler beim Speichern des Nutzers"); }

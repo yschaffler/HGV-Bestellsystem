@@ -303,6 +303,11 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	// Check for duplicate username
+	if _, err := getUserByUsername(u.Username, DB); err == nil {
+		w.WriteHeader(http.StatusConflict) // 409 – username already taken
+		return
+	}
 	h := sha256.New()
 	h.Write([]byte(u.Password))
 	hashedPassword := base64.StdEncoding.EncodeToString(h.Sum(nil))
