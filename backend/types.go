@@ -89,11 +89,12 @@ type PrinterSettingsConfig struct {
 
 //Type definition for a user as defined in the database schema
 type User struct {
-	Id       int    `json:"user_id"`
-	Username string `json:"user_username"`
-	Name     string `json:"user_realname"`
-	Password string `json:"user_password"`
-	Role     string `json:"user_role"`
+	Id           int    `json:"user_id"`
+	Username     string `json:"user_username"`
+	Name         string `json:"user_realname"`
+	Password     string `json:"user_password"`
+	Role         string `json:"user_role"`
+	TokenVersion int    `json:"-"` // never exposed to frontend
 }
 
 //Type definition for a login request containing all the necessary information needed for user authentication

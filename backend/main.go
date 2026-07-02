@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -417,6 +418,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		"username": u.Username,
 		"name":     u.Name,
 		"role":     u.Role,
+		"ver":      u.TokenVersion,
 		"exp":      time.Now().Add(30 * 24 * time.Hour).Unix(),
 	})
 	tokenString, _ := token.SignedString([]byte("SECRET_KEY"))
@@ -432,39 +434,19 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 //provides the data of the current user from the cookie
 func currentUser(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("auth_token")
+	_, u, err := validateToken(r)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	token, _ := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
-		return []byte("SECRET_KEY"), nil
-	})
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		idFloat, ok := claims["id"].(float64)
-		if !ok {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		id := int(idFloat)
-		u, err := getUserById(id, DB)
-		if err != nil {
-			log.Printf("error retrieving user information: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		data, err := json.Marshal(u)
-		if err != nil {
-			log.Printf("error parsing json: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Write(data)
-	} else {
-		w.WriteHeader(http.StatusUnauthorized)
+	data, err := json.Marshal(u)
+	if err != nil {
+		log.Printf("error parsing json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
 }
 
 //handles user logout
@@ -479,21 +461,45 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-//returns true when the account of the user possesses the admin role and otherwise returns false,
-//used for securing endpoints that require admin privileges
-func requireAdmin(r *http.Request) bool {
+// validateToken parses the JWT from the request cookie and verifies the
+// token_version against the database. Returns the claims and the DB user on
+// success, or an error if the token is missing, invalid, or belongs to a
+// session that has been invalidated (e.g. after a password change).
+func validateToken(r *http.Request) (jwt.MapClaims, User, error) {
 	cookie, err := r.Cookie("auth_token")
 	if err != nil {
-		return false
+		return nil, User{}, err
 	}
 	token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
 		return []byte("SECRET_KEY"), nil
 	})
 	if err != nil || !token.Valid {
-		return false
+		return nil, User{}, fmt.Errorf("invalid token")
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
+		return nil, User{}, fmt.Errorf("invalid claims")
+	}
+	idFloat, ok := claims["id"].(float64)
+	if !ok {
+		return nil, User{}, fmt.Errorf("missing id claim")
+	}
+	u, err := getUserById(int(idFloat), DB)
+	if err != nil {
+		return nil, User{}, fmt.Errorf("user not found: %w", err)
+	}
+	ver, _ := claims["ver"].(float64)
+	if int(ver) != u.TokenVersion {
+		return nil, User{}, fmt.Errorf("token invalidated")
+	}
+	return claims, u, nil
+}
+
+//returns true when the account of the user possesses the admin role and otherwise returns false,
+//used for securing endpoints that require admin privileges
+func requireAdmin(r *http.Request) bool {
+	claims, _, err := validateToken(r)
+	if err != nil {
 		return false
 	}
 	role, _ := claims["role"].(string)
