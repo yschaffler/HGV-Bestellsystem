@@ -113,46 +113,54 @@ export default function Settingspage() {
     updatePrinter({ ...printerSettings, rules: printerSettings.rules.filter(r => r.id !== id) });
   }
 
+  // ── Data fetchers (reusable for targeted refreshes) ───────────────────────
+
+  async function fetchCategories() {
+    const res = await fetch("/get/all-categories/");
+    if (!res.ok) throw new Error();
+    const catData: ApiCategory[] = await res.json();
+    const cMap = new Map<string, number>();
+    const rMap = new Map<number, string>();
+    const cats: Category[] = [];
+    catData.forEach(c => {
+      cMap.set(c.category_name, c.category_id);
+      rMap.set(c.category_id, c.category_name);
+      cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
+    });
+    setCategoryMap(cMap);
+    setCategories(cats);
+    return { cMap, rMap };
+  }
+
+  async function fetchProducts(rMap: Map<number, string>) {
+    const res = await fetch("/get/all-products/");
+    if (!res.ok) throw new Error();
+    const prodData: ApiProduct[] = await res.json();
+    setProducts(prodData.map(p => ({
+      id: p.product_id.toString(),
+      name: p.name,
+      category: rMap.get(p.category) || "Unbekannt",
+      price: p.price,
+    })));
+  }
+
+  async function fetchUsers() {
+    const res = await fetch("/get/all-users/");
+    if (!res.ok) throw new Error();
+    const userData: ApiUser[] = await res.json();
+    setUsers(userData.map(u => ({
+      id: u.user_id.toString(),
+      username: u.user_username,
+      password: u.user_password,
+      role: u.user_role,
+    })));
+  }
+
   React.useEffect(() => {
     async function fetchInitialData() {
       try {
-        const catRes = await fetch("/get/all-categories/");
-        const prodRes = await fetch("/get/all-products/");
-        const userRes = await fetch("/get/all-users/");
-
-        if (!catRes.ok || !prodRes.ok || !userRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
-
-        const catData: ApiCategory[] = await catRes.json();
-        const prodData: ApiProduct[] = await prodRes.json();
-        const userData: ApiUser[] = await userRes.json();
-
-        const cMap = new Map<string, number>();
-        const rMap = new Map<number, string>();
-        const cats: Category[] = [];
-
-        catData.forEach(c => {
-          cMap.set(c.category_name, c.category_id);
-          rMap.set(c.category_id, c.category_name);
-          cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
-        });
-
-        setUsers(userData.map(u => (
-          {
-            id: u.user_id.toString(),
-            username: u.user_username,
-            password: u.user_password,
-            role: u.user_role
-          })));
-        setCategoryMap(cMap);
-        setCategories(cats);
-
-        const MAPPED_PRODUCTS: Product[] = prodData.map(p => ({
-          id: p.product_id.toString(),
-          name: p.name,
-          category: rMap.get(p.category) || "Unbekannt",
-          price: p.price,
-        }));
-        setProducts(MAPPED_PRODUCTS);
+        const { rMap } = await fetchCategories();
+        await Promise.all([fetchProducts(rMap), fetchUsers()]);
       } catch (err) {
         console.error(err);
         setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
@@ -161,6 +169,7 @@ export default function Settingspage() {
       }
     }
     fetchInitialData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const allCategoryNames = ["Alle", ...categories.map(c => c.name)];
@@ -180,7 +189,10 @@ export default function Settingspage() {
         body: JSON.stringify({ price: p.price, name: p.name, category: catId })
       });
       if (!res.ok) throw new Error("Konnte Produkt nicht speichern");
-      window.location.reload();
+      // re-fetch only products to get the new ID assigned by the backend
+      const rMap = new Map<number, string>();
+      categories.forEach(c => rMap.set(parseInt(c.id), c.name));
+      await fetchProducts(rMap);
     } catch (err) {
       setError("Fehler beim Speichern des Produkts");
     }
@@ -217,7 +229,8 @@ export default function Settingspage() {
         body: JSON.stringify({ category_name: trimmed, category_color: newCat.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht speichern");
-      window.location.reload();
+      // re-fetch categories to pick up the new ID from the backend
+      await fetchCategories();
     } catch (err) {
       setError("Fehler beim Speichern der Kategorie");
     }
@@ -233,7 +246,9 @@ export default function Settingspage() {
         body: JSON.stringify({ category_id: parseInt(updated.id), category_name: trimmed, category_color: updated.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht updaten");
-      window.location.reload();
+      // category name may have changed → re-fetch both so product labels stay in sync
+      const { rMap } = await fetchCategories();
+      await fetchProducts(rMap);
     } catch (err) {
       setError("Fehler beim Updaten der Kategorie");
     }
@@ -253,7 +268,7 @@ export default function Settingspage() {
         body: JSON.stringify({ user_username: u.username, user_password: u.password, user_role: u.role })
       });
       if (!res.ok) throw new Error();
-      window.location.reload();
+      await fetchUsers();
     } catch { setError("Fehler beim Speichern des Nutzers"); }
   }
 
