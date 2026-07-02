@@ -35,8 +35,11 @@ CREATE TABLE IF NOT EXISTS `user` (
     `username` VARCHAR(15) NOT NULL,
     `name` VARCHAR(50),
     `password` VARCHAR(100) NOT NULL,
-    `role` VARCHAR(15)
+    `role` VARCHAR(15),
+    `token_version` INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Migration for existing DBs:
+-- ALTER TABLE user ADD COLUMN token_version INT NOT NULL DEFAULT 0;
 
 -- Druckereinstellungen (immer genau eine Zeile, id=1)
 CREATE TABLE IF NOT EXISTS `printer_settings` (

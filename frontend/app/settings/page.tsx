@@ -56,8 +56,8 @@ export default function Settingspage() {
   const [collapsed, setCollapsed] = useState({ produkte: true, kategorien: true, nutzer: true, drucker: true, queues: true });
 
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
-  const [newRule, setNewRule] = useState<{ barName: string; tableFrom: string; tableTo: string; categories: string[] }>(
-    { barName: "", tableFrom: "", tableTo: "", categories: [] }
+  const [newRule, setNewRule] = useState<{ barName: string; tableFrom: string; tableTo: string; categories: string[]; accountId: string }>(
+    { barName: "", tableFrom: "", tableTo: "", categories: [], accountId: "" }
   );
 
   useEffect(() => {
@@ -103,55 +103,64 @@ export default function Settingspage() {
       tableFrom,
       tableTo,
       categories: newRule.categories,
+      accountId: newRule.accountId,
     };
     updatePrinter({ ...printerSettings, rules: [...printerSettings.rules, rule] });
-    setNewRule({ barName: "", tableFrom: "", tableTo: "", categories: [] });
+    setNewRule({ barName: "", tableFrom: "", tableTo: "", categories: [], accountId: "" });
   }
 
   function deleteRule(id: string) {
     updatePrinter({ ...printerSettings, rules: printerSettings.rules.filter(r => r.id !== id) });
   }
 
+  // ── Data fetchers (reusable for targeted refreshes) ───────────────────────
+
+  async function fetchCategories() {
+    const res = await fetch("/get/all-categories/");
+    if (!res.ok) throw new Error();
+    const catData: ApiCategory[] = await res.json();
+    const cMap = new Map<string, number>();
+    const rMap = new Map<number, string>();
+    const cats: Category[] = [];
+    catData.forEach(c => {
+      cMap.set(c.category_name, c.category_id);
+      rMap.set(c.category_id, c.category_name);
+      cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
+    });
+    setCategoryMap(cMap);
+    setCategories(cats);
+    return { cMap, rMap };
+  }
+
+  async function fetchProducts(rMap: Map<number, string>) {
+    const res = await fetch("/get/all-products/");
+    if (!res.ok) throw new Error();
+    const prodData: ApiProduct[] = await res.json();
+    setProducts(prodData.map(p => ({
+      id: p.product_id.toString(),
+      name: p.name,
+      category: rMap.get(p.category) || "Unbekannt",
+      price: p.price,
+    })));
+  }
+
+  async function fetchUsers() {
+    const res = await fetch("/get/all-users/");
+    if (!res.ok) throw new Error();
+    const userData: ApiUser[] = await res.json();
+    setUsers(userData.map(u => ({
+      id: u.user_id.toString(),
+      username: u.user_username,
+      password: u.user_password,
+      role: u.user_role,
+    })));
+  }
+
   React.useEffect(() => {
     async function fetchInitialData() {
       try {
-        const catRes = await fetch("/get/all-categories/");
-        const prodRes = await fetch("/get/all-products/");
-        const userRes = await fetch("/get/all-users/");
-
-        if (!catRes.ok || !prodRes.ok || !userRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
-
-        const catData: ApiCategory[] = await catRes.json();
-        const prodData: ApiProduct[] = await prodRes.json();
-        const userData: ApiUser[] = await userRes.json();
-
-        const cMap = new Map<string, number>();
-        const rMap = new Map<number, string>();
-        const cats: Category[] = [];
-
-        catData.forEach(c => {
-          cMap.set(c.category_name, c.category_id);
-          rMap.set(c.category_id, c.category_name);
-          cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
-        });
-
-        setUsers(userData.map(u => (
-          {
-            id: u.user_id.toString(),
-            username: u.user_username,
-            password: u.user_password,
-            role: u.user_role
-          })));
-        setCategoryMap(cMap);
-        setCategories(cats);
-
-        const MAPPED_PRODUCTS: Product[] = prodData.map(p => ({
-          id: p.product_id.toString(),
-          name: p.name,
-          category: rMap.get(p.category) || "Unbekannt",
-          price: p.price,
-        }));
-        setProducts(MAPPED_PRODUCTS);
+        const { rMap } = await fetchCategories();
+        await Promise.all([fetchProducts(rMap), fetchUsers()]);
       } catch (err) {
         console.error(err);
         setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
@@ -160,6 +169,7 @@ export default function Settingspage() {
       }
     }
     fetchInitialData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const allCategoryNames = ["Alle", ...categories.map(c => c.name)];
@@ -179,7 +189,10 @@ export default function Settingspage() {
         body: JSON.stringify({ price: p.price, name: p.name, category: catId })
       });
       if (!res.ok) throw new Error("Konnte Produkt nicht speichern");
-      window.location.reload();
+      // re-fetch only products to get the new ID assigned by the backend
+      const rMap = new Map<number, string>();
+      categories.forEach(c => rMap.set(parseInt(c.id), c.name));
+      await fetchProducts(rMap);
     } catch (err) {
       setError("Fehler beim Speichern des Produkts");
     }
@@ -216,7 +229,8 @@ export default function Settingspage() {
         body: JSON.stringify({ category_name: trimmed, category_color: newCat.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht speichern");
-      window.location.reload();
+      // re-fetch categories to pick up the new ID from the backend
+      await fetchCategories();
     } catch (err) {
       setError("Fehler beim Speichern der Kategorie");
     }
@@ -232,7 +246,9 @@ export default function Settingspage() {
         body: JSON.stringify({ category_id: parseInt(updated.id), category_name: trimmed, category_color: updated.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht updaten");
-      window.location.reload();
+      // category name may have changed → re-fetch both so product labels stay in sync
+      const { rMap } = await fetchCategories();
+      await fetchProducts(rMap);
     } catch (err) {
       setError("Fehler beim Updaten der Kategorie");
     }
@@ -252,7 +268,7 @@ export default function Settingspage() {
         body: JSON.stringify({ user_username: u.username, user_password: u.password, user_role: u.role })
       });
       if (!res.ok) throw new Error();
-      window.location.reload();
+      await fetchUsers();
     } catch { setError("Fehler beim Speichern des Nutzers"); }
   }
 
@@ -546,6 +562,8 @@ export default function Settingspage() {
                       const catLabel = (rule.categories ?? []).length > 0
                         ? rule.categories.join(", ")
                         : "Alle Kategorien";
+                      const accountUser = rule.accountId ? users.find(u => u.id === rule.accountId) : null;
+                      const accountLabel = accountUser ? accountUser.username : null;
                       return (
                         <div key={rule.id} className="flex items-start gap-2 bg-muted/20 border rounded-xl px-3 py-2.5">
                           <div className="flex-1 min-w-0">
@@ -556,6 +574,11 @@ export default function Settingspage() {
                             <div className="flex flex-wrap gap-1.5 mt-1.5">
                               <span className="text-xs bg-background border rounded-md px-2 py-0.5 text-muted-foreground">{tableLabel}</span>
                               <span className="text-xs bg-background border rounded-md px-2 py-0.5 text-muted-foreground">{catLabel}</span>
+                              {accountLabel && (
+                                <span className="text-xs bg-primary/10 border border-primary/20 rounded-md px-2 py-0.5 text-primary font-medium">
+                                  Account: {accountLabel}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <button
@@ -606,6 +629,21 @@ export default function Settingspage() {
                           className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors"
                         />
                       </div>
+                    </div>
+
+                    {/* Account filter */}
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Account <span className="opacity-60">(leer = alle Accounts)</span></label>
+                      <select
+                        value={newRule.accountId}
+                        onChange={e => setNewRule(r => ({ ...r, accountId: e.target.value }))}
+                        className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors"
+                      >
+                        <option value="">Alle Accounts</option>
+                        {users.filter(u => u.role === "BAR" || u.role === "KELLNER").map(u => (
+                          <option key={u.id} value={u.id}>{u.username}</option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Category filter */}
