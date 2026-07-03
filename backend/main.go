@@ -362,10 +362,10 @@ func requireAdmin(r *http.Request) bool {
 	return role == "ADMIN"
 }
 
-// findPrinterForItem returns the first matching printer name for an item,
-// or "" if no rule matches.
-func findPrinterForItem(pos RechnungPosition, table int, kellnerId string, settings PrinterSettingsConfig) string {
-	for _, rule := range settings.Rules {
+// findRuleForItem returns the first matching rule for an item, or nil if none matches.
+func findRuleForItem(pos RechnungPosition, table int, kellnerId string, settings PrinterSettingsConfig) *PrinterRule {
+	for i := range settings.Rules {
+		rule := &settings.Rules[i]
 		if rule.TableFrom != nil && table < *rule.TableFrom {
 			continue
 		}
@@ -387,12 +387,15 @@ func findPrinterForItem(pos RechnungPosition, table int, kellnerId string, setti
 				continue
 			}
 		}
-		return rule.BarName
+		return rule
 	}
-	return ""
+	return nil
 }
 
-// routePrintJobs splits order items by printer and enqueues a PrintJob per printer.
+// routePrintJobs splits order items by rule and enqueues one PrintJob per matching rule.
+// Items matched by the same rule are grouped into one bon; two rules pointing to the same
+// physical printer therefore produce two separate bons — which is intentional so that a
+// cashier printer can hand out separate slips for e.g. "Getränke" and "Grillstand".
 func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, orderID int64) {
 	// Bar orders (tisch=0) respect the printBarOrders toggle
 	if req.Tisch == 0 && !settings.PrintBarOrders {
@@ -405,39 +408,37 @@ func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, o
 	}
 	waiterName := waiterNameForPrint(req.KellnerId)
 
-	// Group items by target printer (preserving order)
-	type entry struct {
-		printer string
-		item    ws.OrderItem
-	}
-	grouped := make(map[string][]ws.OrderItem)
-	order := []string{}
-	seen := make(map[string]bool)
+	// Group items by rule ID (preserving first-seen order).
+	// Using rule ID as key ensures two rules on the same printer produce separate bons.
+	grouped := make(map[string][]ws.OrderItem) // ruleID → items
+	ruleOrder := []string{}                    // preserves insertion order
+	ruleToBar := make(map[string]string)        // ruleID → barName
 
 	for _, pos := range req.Positionen {
-		printer := findPrinterForItem(pos, req.Tisch, req.KellnerId, settings)
-		if printer == "" {
+		rule := findRuleForItem(pos, req.Tisch, req.KellnerId, settings)
+		if rule == nil {
 			continue
 		}
-		grouped[printer] = append(grouped[printer], ws.OrderItem{
+		key := rule.ID
+		grouped[key] = append(grouped[key], ws.OrderItem{
 			Name:     pos.Name,
 			Quantity: pos.Amount,
 			Price:    pos.Price,
 			Note:     pos.Note,
 		})
-		if !seen[printer] {
-			order = append(order, printer)
-			seen[printer] = true
+		if _, exists := ruleToBar[key]; !exists {
+			ruleOrder = append(ruleOrder, key)
+			ruleToBar[key] = rule.BarName
 		}
 	}
 
-	for _, printer := range order {
-		PrintHub.EnqueueAndSend(printer, &ws.PrintJob{
+	for _, ruleID := range ruleOrder {
+		PrintHub.EnqueueAndSend(ruleToBar[ruleID], &ws.PrintJob{
 			OrderID:    int(orderID),
 			JobType:    jobType,
 			Table:      req.Tisch,
 			WaiterName: waiterName,
-			Items:      grouped[printer],
+			Items:      grouped[ruleID],
 			Note:       req.Note,
 		})
 	}
