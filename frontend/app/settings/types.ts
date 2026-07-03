@@ -15,7 +15,7 @@ export type User = {
   id: string;
   username: string;
   password: string;
-  role: "ADMIN" | "KELLNER" | "BAR";
+  role: "ADMIN" | "KELLNER";
 };
 
 export type DeleteDialog =
