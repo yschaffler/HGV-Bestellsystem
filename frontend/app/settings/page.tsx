@@ -181,6 +181,7 @@ export default function Settingspage() {
   // ─── Product actions ───────────────────────────────────────────────────────
 
   async function addProduct(p: Omit<Product, "id">) {
+    setError("");
     try {
       const catId = categoryMap.get(p.category) || 0;
       const res = await fetch("/add/product/", {
@@ -199,6 +200,7 @@ export default function Settingspage() {
   }
 
   async function updateProduct(updated: Product) {
+    setError("");
     try {
       const catId = categoryMap.get(updated.category) || 0;
       const res = await fetch("/update/product/", {
@@ -220,6 +222,7 @@ export default function Settingspage() {
   // ─── Category actions ──────────────────────────────────────────────────────
 
   async function addCategory(newCat: Omit<Category, "id">) {
+    setError("");
     const trimmed = newCat.name.trim();
     if (!trimmed || categories.some(c => c.name === trimmed)) return;
     try {
@@ -237,6 +240,7 @@ export default function Settingspage() {
   }
 
   async function updateCategory(updated: Category) {
+    setError("");
     const trimmed = updated.name.trim();
     if (!trimmed) return;
     try {
@@ -261,6 +265,7 @@ export default function Settingspage() {
   // ─── User actions ──────────────────────────────────────────────────────
 
   async function addUser(u: Omit<User, "id">) {
+    setError("");
     try {
       const res = await fetch("/add/user/", {
         method: "POST",
@@ -274,12 +279,14 @@ export default function Settingspage() {
   }
 
   async function updateUser(updated: User) {
+    setError("");
     try {
       const res = await fetch("/update/user/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: parseInt(updated.id), user_username: updated.username, user_password: updated.password, user_role: updated.role })
       });
+      if (res.status === 409) { setError("Benutzername bereits vergeben"); return; }
       if (!res.ok) throw new Error();
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
     } catch { setError("Fehler beim Updaten des Nutzers"); }
@@ -641,7 +648,7 @@ export default function Settingspage() {
                         className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors"
                       >
                         <option value="">Alle Accounts</option>
-                        {users.filter(u => u.role === "BAR" || u.role === "KELLNER").map(u => (
+                        {users.map(u => (
                           <option key={u.id} value={u.id}>{u.username}</option>
                         ))}
                       </select>

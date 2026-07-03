@@ -29,7 +29,7 @@ export type ApiUser = {
   user_username: string;
   user_password: string;
   user_realname: string;
-  user_role: "ADMIN" | "KELLNER" | "BAR"
+  user_role: "ADMIN" | "KELLNER"
 };
 
 export type ApiCategory = { 

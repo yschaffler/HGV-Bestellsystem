@@ -22,16 +22,19 @@ type PrintJob struct {
 	EnqueuedAt time.Time   `json:"enqueued_at"`
 }
 
+//queue for the printer jobs for a bar
 type printQueue struct {
 	mu      sync.Mutex
 	pending []*PrintJob
 	nextID  int
 }
 
+//creates a new printQueue
 func newPrintQueue() *printQueue {
 	return &printQueue{nextID: 1}
 }
 
+//adds a print job to the queue
 func (q *printQueue) Add(job *PrintJob) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -45,6 +48,7 @@ func (q *printQueue) Add(job *PrintJob) {
 	q.pending = append(q.pending, job)
 }
 
+//returns the list of printer jobs still pending
 func (q *printQueue) Pending() []*PrintJob {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -64,6 +68,7 @@ func (q *printQueue) Ack(orderID int) {
 	}
 }
 
+//deletes the order specified by the id from the queue
 func (q *printQueue) Delete(orderID int) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -76,6 +81,7 @@ func (q *printQueue) Delete(orderID int) bool {
 	return false
 }
 
+//find and returns a printer job specified by its id in the queue
 func (q *printQueue) Find(orderID int) *PrintJob {
 	q.mu.Lock()
 	defer q.mu.Unlock()
