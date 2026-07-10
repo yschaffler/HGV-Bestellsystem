@@ -21,6 +21,7 @@ import {
   Printer,
   Trash2,
   Activity,
+  Archive,
 } from "lucide-react";
 import { fetchPrinterSettings, updatePrinterSettings, DEFAULT_SETTINGS } from "@/lib/printerSettings";
 import type { PrinterSettings, PrinterRule } from "@/lib/printerSettings";
@@ -512,6 +513,21 @@ export default function Settingspage() {
               <div className="flex-1 min-w-0">
                 <p className="text-base font-bold text-foreground">Statistiken</p>
                 <p className="text-xs text-muted-foreground">Umsatz, Kellner, Kategorien & Event-Reset</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+
+            {/* ── Event-Archiv ──────────────────────────────────────────────── */}
+            <button
+              onClick={() => router.push("/admin/events")}
+              className="w-full flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-4 hover:bg-secondary/30 active:scale-[0.98] transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Archive className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold text-foreground">Event-Archiv</p>
+                <p className="text-xs text-muted-foreground">Vergangene Events & PDF-Export</p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </button>

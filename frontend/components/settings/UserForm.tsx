@@ -24,7 +24,7 @@ export function UserForm({ initial, onSave, onCancel }: UserFormProps) {
   const [username, setUsername] = useState(initial?.username ?? "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<"ADMIN" | "KELLNER">(initial?.role ?? "KELLNER");
+  const [role, setRole] = useState<"ADMIN" | "KELLNER" | "BAR">(initial?.role ?? "KELLNER");
   const [changePassword, setChangePassword] = useState(!isEditing);
 
   const valid = username.trim().length > 0 && (!changePassword || password.trim().length > 0);

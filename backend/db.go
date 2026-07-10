@@ -421,6 +421,77 @@ func resetAutoIncrementForOrders(db *sql.DB) error {
 	return err
 }
 
+// ensureEventTable creates the events archive table if it doesn't exist.
+func ensureEventTable(db *sql.DB) error {
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS events (
+		id            INT AUTO_INCREMENT PRIMARY KEY,
+		name          VARCHAR(255) NOT NULL,
+		erstellt_am   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		gesamt        DECIMAL(10,2) NOT NULL,
+		rechnungen    JSON NOT NULL
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+	return err
+}
+
+// insertEvent saves an event snapshot; returns the new ID.
+func insertEvent(name string, gesamt float64, rechnungen []Rechnung, db *sql.DB) (int64, error) {
+	data, err := json.Marshal(rechnungen)
+	if err != nil {
+		return 0, err
+	}
+	res, err := db.Exec(
+		"INSERT INTO events (name, gesamt, rechnungen) VALUES (?, ?, ?)",
+		name, gesamt, string(data),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// getAllEvents returns all archived events (without the full rechnungen payload).
+func getAllEvents(db *sql.DB) ([]ArchivedEvent, error) {
+	rows, err := db.Query("SELECT id, name, erstellt_am, gesamt FROM events ORDER BY erstellt_am DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []ArchivedEvent
+	for rows.Next() {
+		var e ArchivedEvent
+		if err := rows.Scan(&e.Id, &e.Name, &e.ErstelltAm, &e.Gesamt); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	if events == nil {
+		events = []ArchivedEvent{}
+	}
+	return events, nil
+}
+
+// getEventById returns a single event including its full rechnungen snapshot.
+func getEventById(id int, db *sql.DB) (ArchivedEvent, error) {
+	var e ArchivedEvent
+	var raw string
+	err := db.QueryRow(
+		"SELECT id, name, erstellt_am, gesamt, rechnungen FROM events WHERE id=?", id,
+	).Scan(&e.Id, &e.Name, &e.ErstelltAm, &e.Gesamt, &raw)
+	if err != nil {
+		return ArchivedEvent{}, err
+	}
+	if err := json.Unmarshal([]byte(raw), &e.Rechnungen); err != nil {
+		return ArchivedEvent{}, err
+	}
+	return e, nil
+}
+
+// deleteEvent removes an archived event by ID.
+func deleteEvent(id int, db *sql.DB) error {
+	_, err := db.Exec("DELETE FROM events WHERE id=?", id)
+	return err
+}
+
 // ensurePushTables creates the push_subscriptions and app_config tables if they
 // don't exist. Called once at startup so no schema migration file is needed.
 func ensurePushTables(db *sql.DB) error {
