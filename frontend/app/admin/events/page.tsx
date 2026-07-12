@@ -65,7 +65,7 @@ export default function EventsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/admin/events/");
+      const res = await fetch("/get/events/");
       if (res.status === 401 || res.status === 403) {
         router.push("/");
         return;
@@ -81,7 +81,7 @@ export default function EventsPage() {
 
   async function deleteEvent(id: number) {
     try {
-      const res = await fetch(`/admin/events/${id}`, { method: "DELETE" });
+      const res = await fetch(`/delete/event/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setEvents((prev) => prev.filter((e) => e.event_id !== id));
     } catch {
@@ -149,7 +149,7 @@ export default function EventsPage() {
               </CardHeader>
               <CardContent className="pt-0 flex gap-2">
                 <a
-                  href={`/admin/events/${event.event_id}/pdf/`}
+                  href={`/get/event-pdf/${event.event_id}/`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1"
