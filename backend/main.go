@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -145,161 +146,17 @@ func deleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-//--  the following functions contain the CRUD operations for the Order table from the database
-//and some additional operations on the order table --
-func createOrderHandler(w http.ResponseWriter, r *http.Request) {
-	var o Order
-	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
-		log.Printf("error parsing new order from request body: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if err := insertOrder(o, DB); err != nil {
-		log.Printf("error isnerting order into database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func getUnpaidOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	orders, err := getUnpaidOrders(DB)
-	if err != nil {
-		log.Printf("errorretrieving unoaid order form the database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	data, err := json.Marshal(orders)
-	if err != nil {
-		log.Printf("error marhsaling orders to json: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(data)
-}
-
-func getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	orders, err := getAllOrders(DB)
-	if err != nil {
-		log.Printf("errorretrieving unoaid order form the database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	data, err := json.Marshal(orders)
-	if err != nil {
-		log.Printf("error marhsaling orders to json: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(data)
-}
-
-func getOpenOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
-	idString := r.PathValue("id")
-	id, err := strconv.Atoi(idString)
-	if err != nil {
-		log.Printf("error parsing id from parameters: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	orders, err := getOpenOrdersForTable(id, DB)
-	data, err := json.Marshal(orders)
-	if err != nil {
-		log.Printf("error marshaling orders to json: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(data)
-}
-
-func getAllOrdersForTableHandler(w http.ResponseWriter, r *http.Request) {
-	idString := r.PathValue("id")
-	id, err := strconv.Atoi(idString)
-	if err != nil {
-		log.Printf("error parsing id from parameters: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	orders, err := getAllOrdersForTable(id, DB)
-	data, err := json.Marshal(orders)
-	if err != nil {
-		log.Printf("error marshaling orders to json: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(data)
-}
-
-func updateOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	var o Order
-	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
-		log.Printf("error decoding order from json: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if err := updateOrder(o, DB); err != nil {
-		log.Printf("error updating order: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func deleteOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	var o Order
-	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
-		log.Printf("error decodign order from json: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if err := deleteOrder(o, DB); err != nil {
-		log.Printf("error deleting order: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func payOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	var body PayRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		log.Printf("error decoding pay orders from json: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if err := payTableItems(body.Table, body.Items, DB); err != nil {
-		log.Printf("error paying orders in database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func returnOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	var body PayRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		log.Printf("error decoding return orders from json: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if err := returnTableItems(body.Table, body.Items, DB); err != nil {
-		log.Printf("error returning orders in database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
 //-- the following functions contain the CRUD operations for the user table from the database ---
 func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var u User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		log.Printf("error decoding user data from json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// Check for duplicate username
+	if _, err := getUserByUsername(u.Username, DB); err == nil {
+		w.WriteHeader(http.StatusConflict) // 409 – username already taken
 		return
 	}
 	h := sha256.New()
@@ -417,6 +274,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		"username": u.Username,
 		"name":     u.Name,
 		"role":     u.Role,
+		"ver":      u.TokenVersion,
 		"exp":      time.Now().Add(30 * 24 * time.Hour).Unix(),
 	})
 	tokenString, _ := token.SignedString([]byte("SECRET_KEY"))
@@ -432,39 +290,19 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 //provides the data of the current user from the cookie
 func currentUser(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("auth_token")
+	_, u, err := validateToken(r)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	token, _ := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
-		return []byte("SECRET_KEY"), nil
-	})
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		idFloat, ok := claims["id"].(float64)
-		if !ok {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		id := int(idFloat)
-		u, err := getUserById(id, DB)
-		if err != nil {
-			log.Printf("error retrieving user information: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		data, err := json.Marshal(u)
-		if err != nil {
-			log.Printf("error parsing json: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Write(data)
-	} else {
-		w.WriteHeader(http.StatusUnauthorized)
+	data, err := json.Marshal(u)
+	if err != nil {
+		log.Printf("error parsing json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(data)
 }
 
 //handles user logout
@@ -479,31 +317,55 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-//returns true when the account of the user possesses the admin role and otherwise returns false,
-//used for securing endpoints that require admin privileges
-func requireAdmin(r *http.Request) bool {
+// validateToken parses the JWT from the request cookie and verifies the
+// token_version against the database. Returns the claims and the DB user on
+// success, or an error if the token is missing, invalid, or belongs to a
+// session that has been invalidated (e.g. after a password change).
+func validateToken(r *http.Request) (jwt.MapClaims, User, error) {
 	cookie, err := r.Cookie("auth_token")
 	if err != nil {
-		return false
+		return nil, User{}, err
 	}
 	token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
 		return []byte("SECRET_KEY"), nil
 	})
 	if err != nil || !token.Valid {
-		return false
+		return nil, User{}, fmt.Errorf("invalid token")
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
+		return nil, User{}, fmt.Errorf("invalid claims")
+	}
+	idFloat, ok := claims["id"].(float64)
+	if !ok {
+		return nil, User{}, fmt.Errorf("missing id claim")
+	}
+	u, err := getUserById(int(idFloat), DB)
+	if err != nil {
+		return nil, User{}, fmt.Errorf("user not found: %w", err)
+	}
+	ver, _ := claims["ver"].(float64)
+	if int(ver) != u.TokenVersion {
+		return nil, User{}, fmt.Errorf("token invalidated")
+	}
+	return claims, u, nil
+}
+
+//returns true when the account of the user possesses the admin role and otherwise returns false,
+//used for securing endpoints that require admin privileges
+func requireAdmin(r *http.Request) bool {
+	claims, _, err := validateToken(r)
+	if err != nil {
 		return false
 	}
 	role, _ := claims["role"].(string)
 	return role == "ADMIN"
 }
 
-// findPrinterForItem returns the first matching printer name for an item,
-// or "" if no rule matches.
-func findPrinterForItem(pos RechnungPosition, table int, kellnerId string, settings PrinterSettingsConfig) string {
-	for _, rule := range settings.Rules {
+// findRuleForItem returns the first matching rule for an item, or nil if none matches.
+func findRuleForItem(pos RechnungPosition, table int, kellnerId string, settings PrinterSettingsConfig) *PrinterRule {
+	for i := range settings.Rules {
+		rule := &settings.Rules[i]
 		if rule.TableFrom != nil && table < *rule.TableFrom {
 			continue
 		}
@@ -525,12 +387,15 @@ func findPrinterForItem(pos RechnungPosition, table int, kellnerId string, setti
 				continue
 			}
 		}
-		return rule.BarName
+		return rule
 	}
-	return ""
+	return nil
 }
 
-// routePrintJobs splits order items by printer and enqueues a PrintJob per printer.
+// routePrintJobs splits order items by rule and enqueues one PrintJob per matching rule.
+// Items matched by the same rule are grouped into one bon; two rules pointing to the same
+// physical printer therefore produce two separate bons — which is intentional so that a
+// cashier printer can hand out separate slips for e.g. "Getränke" and "Grillstand".
 func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, orderID int64) {
 	// Bar orders (tisch=0) respect the printBarOrders toggle
 	if req.Tisch == 0 && !settings.PrintBarOrders {
@@ -543,39 +408,37 @@ func routePrintJobs(req CreateRechnungRequest, settings PrinterSettingsConfig, o
 	}
 	waiterName := waiterNameForPrint(req.KellnerId)
 
-	// Group items by target printer (preserving order)
-	type entry struct {
-		printer string
-		item    ws.OrderItem
-	}
-	grouped := make(map[string][]ws.OrderItem)
-	order := []string{}
-	seen := make(map[string]bool)
+	// Group items by rule ID (preserving first-seen order).
+	// Using rule ID as key ensures two rules on the same printer produce separate bons.
+	grouped := make(map[string][]ws.OrderItem) // ruleID → items
+	ruleOrder := []string{}                    // preserves insertion order
+	ruleToBar := make(map[string]string)        // ruleID → barName
 
 	for _, pos := range req.Positionen {
-		printer := findPrinterForItem(pos, req.Tisch, req.KellnerId, settings)
-		if printer == "" {
+		rule := findRuleForItem(pos, req.Tisch, req.KellnerId, settings)
+		if rule == nil {
 			continue
 		}
-		grouped[printer] = append(grouped[printer], ws.OrderItem{
+		key := rule.ID
+		grouped[key] = append(grouped[key], ws.OrderItem{
 			Name:     pos.Name,
 			Quantity: pos.Amount,
 			Price:    pos.Price,
 			Note:     pos.Note,
 		})
-		if !seen[printer] {
-			order = append(order, printer)
-			seen[printer] = true
+		if _, exists := ruleToBar[key]; !exists {
+			ruleOrder = append(ruleOrder, key)
+			ruleToBar[key] = rule.BarName
 		}
 	}
 
-	for _, printer := range order {
-		PrintHub.EnqueueAndSend(printer, &ws.PrintJob{
+	for _, ruleID := range ruleOrder {
+		PrintHub.EnqueueAndSend(ruleToBar[ruleID], &ws.PrintJob{
 			OrderID:    int(orderID),
 			JobType:    jobType,
 			Table:      req.Tisch,
 			WaiterName: waiterName,
-			Items:      grouped[printer],
+			Items:      grouped[ruleID],
 			Note:       req.Note,
 		})
 	}
@@ -970,11 +833,117 @@ func unsubscribePushHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// ── Event archive handlers ────────────────────────────────────────────────────
+
+func getEventsHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	events, err := getAllEvents(DB)
+	if err != nil {
+		log.Printf("getEventsHandler: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(events)
+}
+
+func createEventHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	rechnungen, err := getAllRechnungen(DB)
+	if err != nil {
+		log.Printf("createEventHandler: getAllRechnungen: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	gesamt := 0.0
+	for _, rec := range rechnungen {
+		gesamt += rec.Gesamt
+	}
+	id, err := insertEvent(req.Name, gesamt, rechnungen, DB)
+	if err != nil {
+		log.Printf("createEventHandler: insertEvent: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{"event_id": id})
+}
+
+func deleteEventHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := deleteEvent(id, DB); err != nil {
+		log.Printf("deleteEventHandler: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func getEventPDFHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	event, err := getEventById(id, DB)
+	if err != nil {
+		log.Printf("getEventPDFHandler: getEventById: %v", err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	m, err := getEventPDF(event)
+	if err != nil {
+		log.Printf("getEventPDFHandler: getEventPDF: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	doc, err := m.Generate()
+	if err != nil {
+		log.Printf("getEventPDFHandler: Generate: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	filename := fmt.Sprintf("event-%s.pdf", event.Name)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
+	w.Write(doc.GetBytes())
+}
+
 //main entrypoint for the program, establishing a database connection, setting up all server endpoints and serving
 func main() {
 	OpenDatabaseHandle()
 	if err := ensurePushTables(DB); err != nil {
 		log.Fatalf("failed to create push tables: %v", err)
+	}
+	if err := ensureEventTable(DB); err != nil {
+		log.Fatalf("failed to create events table: %v", err)
 	}
 	initVAPIDKeys()
 	PrintHub = ws.NewHub(os.Getenv("PRINTER_SECRET"))
@@ -982,37 +951,32 @@ func main() {
 	router := http.NewServeMux()
 	router.HandleFunc("/get/all-products/", getProducts)
 	router.HandleFunc("/get/all-categories/", getCategories)
-	router.HandleFunc("/get/all-orders/", getAllOrdersHandler)
-	router.HandleFunc("/get/unpaid-orders/", getUnpaidOrdersHandler)
 	router.HandleFunc("/get/all-users/", getAllUsersHandler)
-	router.HandleFunc("/get/order/table/{id}", getOpenOrdersForTableHandler)
-	router.HandleFunc("/get/all-orders/table/{id}", getAllOrdersForTableHandler)
 	router.HandleFunc("/get/user/{id}", getUserByIdHandler)
 	router.HandleFunc("/get/statistics-pdf/", getLatestPDFStatisticsHandler)
 
 	router.HandleFunc("/add/product/", addProduct)
 	router.HandleFunc("/add/category/", addCategoryHandler)
-	router.HandleFunc("/add/order/", createOrderHandler)
 	router.HandleFunc("/add/user/", createUserHandler)
 
 	router.HandleFunc("/update/product/", updateProductHandler)
 	router.HandleFunc("/update/category/", updateCategoryHandler)
-	router.HandleFunc("/update/order/", updateOrdersHandler)
 	router.HandleFunc("/update/user/", updateUserHandler)
 
 	router.HandleFunc("/delete/product/", deleteProductHandler)
 	router.HandleFunc("/delete/category/", deleteCategoryHandler)
-	router.HandleFunc("/delete/order/", deleteOrdersHandler)
 	router.HandleFunc("/delete/user/", deleteUserHandler)
-
-	router.HandleFunc("/pay/orders/", payOrdersHandler)
-	router.HandleFunc("/return/orders/", returnOrdersHandler)
 
 	router.HandleFunc("POST /add/rechnung/", createRechnungHandler)
 	router.HandleFunc("GET /get/rechnungen/table/{id}", getRechnungenForTableHandler)
 
 	router.HandleFunc("GET /admin/rechnungen/", getAllRechnungenHandler)
 	router.HandleFunc("POST /admin/reset/rechnungen/", resetRechnungenHandler)
+
+	router.HandleFunc("GET /admin/events/", getEventsHandler)
+	router.HandleFunc("POST /admin/events/", createEventHandler)
+	router.HandleFunc("DELETE /admin/events/{id}", deleteEventHandler)
+	router.HandleFunc("GET /admin/events/{id}/pdf/", getEventPDFHandler)
 
 	router.Handle("/ws/printer", PrintHub)
 

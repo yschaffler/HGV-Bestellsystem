@@ -122,194 +122,6 @@ func deleteCategory(id int, db *sql.DB) error {
 	return err
 }
 
-//insert a order into the db
-func insertOrder(o Order, db *sql.DB) error {
-	query := fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, `table`) VALUES (%v, %v, %v, %v, %v);", o.Product, o.Amount, o.Price, o.Payed, o.Table)
-	_, err := db.Exec(query)
-	return err
-}
-
-//get every unpaid order from the db
-func getUnpaidOrders(db *sql.DB) ([]Order, error) {
-	var orders []Order
-	rows, err := db.Query("SELECT * FROM bestellungen WHERE payed=false;")
-	if err != nil {
-		return []Order{}, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var o Order
-		err = rows.Scan(&o.Id, &o.Product, &o.Amount, &o.Price, &o.Payed, &o.Table)
-		if err != nil {
-			return []Order{}, err
-		}
-		orders = append(orders, o)
-	}
-	return orders, nil
-}
-
-//return all unpaid orders of a table from the db
-func getOpenOrdersForTable(table int, db *sql.DB) ([]Order, error) {
-	var orders []Order
-	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE `table`=%v AND payed=false;", table)
-	rows, err := db.Query(query)
-	if err != nil {
-		return []Order{}, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var o Order
-		err = rows.Scan(&o.Id, &o.Product, &o.Amount, &o.Price, &o.Payed, &o.Table)
-		if err != nil {
-			return []Order{}, err
-		}
-		orders = append(orders, o)
-	}
-	return orders, nil
-}
-
-//get all orders for a table from the db
-func getAllOrdersForTable(table int, db *sql.DB) ([]Order, error) {
-	var orders []Order
-	query := fmt.Sprintf("SELECT * FROM bestellungen WHERE `table`=%v;", table)
-	rows, err := db.Query(query)
-	if err != nil {
-		return []Order{}, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var o Order
-		err = rows.Scan(&o.Id, &o.Product, &o.Amount, &o.Price, &o.Payed, &o.Table)
-		if err != nil {
-			return []Order{}, err
-		}
-		orders = append(orders, o)
-	}
-	return orders, nil
-}
-
-//returns all orders from the db
-func getAllOrders(db *sql.DB) ([]Order, error) {
-	var orders []Order
-	rows, err := db.Query("SELECT * FROM bestellungen;")
-	if err != nil {
-		return []Order{}, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var o Order
-		err = rows.Scan(&o.Id, &o.Product, &o.Amount, &o.Price, &o.Payed, &o.Table)
-		if err != nil {
-			return []Order{}, err
-		}
-		orders = append(orders, o)
-	}
-	return orders, nil
-}
-
-//update order in the db
-func updateOrder(o Order, db *sql.DB) error {
-	query := fmt.Sprintf("UPDATE bestellungen SET product=%v, amount=%v, price=%v, payed=%v, `table`=%v WHERE id=%v;", o.Product, o.Amount, o.Price, o.Payed, o.Table, o.Id)
-	_, err := db.Exec(query)
-	return err
-}
-
-//delete order from the db
-func deleteOrder(o Order, db *sql.DB) error {
-	query := fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v;", o.Id)
-	_, err := db.Exec(query)
-	return err
-}
-
-//pay items ordered by a table
-func payTableItems(table int, items []PayItem, db *sql.DB) error {
-	for _, item := range items {
-		amountToPay := item.Amount
-		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=false ORDER BY id ASC;", table, item.Product)
-		rows, err := db.Query(query)
-		if err != nil {
-			return err
-		}
-
-		type orderRow struct {
-			id     int
-			amount int
-			price  float64
-		}
-		var openOrders []orderRow
-		for rows.Next() {
-			var o orderRow
-			if err := rows.Scan(&o.id, &o.amount, &o.price); err == nil {
-				openOrders = append(openOrders, o)
-			}
-		}
-		rows.Close()
-
-		for _, row := range openOrders {
-			if amountToPay <= 0 {
-				break
-			}
-			deduct := amountToPay
-			if deduct > row.amount {
-				deduct = row.amount
-			}
-
-			if deduct == row.amount {
-				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET payed=true WHERE id=%v;", row.id))
-			} else {
-				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v;", deduct, row.id))
-				_, _ = db.Exec(fmt.Sprintf("INSERT INTO bestellungen (product, amount, price, payed, `table`) VALUES (%v, %v, %v, true, %v);", item.Product, deduct, row.price, table))
-			}
-			amountToPay -= deduct
-		}
-	}
-	return nil
-}
-
-//updates the items ordered from a table
-func returnTableItems(table int, items []PayItem, db *sql.DB) error {
-	for _, item := range items {
-		amountToReturn := item.Amount
-		query := fmt.Sprintf("SELECT id, amount, price FROM bestellungen WHERE `table`=%v AND product=%v AND payed=true ORDER BY id ASC;", table, item.Product)
-		rows, err := db.Query(query)
-		if err != nil {
-			return err
-		}
-
-		type orderRow struct {
-			id     int
-			amount int
-			price  float64
-		}
-		var openOrders []orderRow
-		for rows.Next() {
-			var o orderRow
-			if err := rows.Scan(&o.id, &o.amount, &o.price); err == nil {
-				openOrders = append(openOrders, o)
-			}
-		}
-		rows.Close()
-
-		for _, row := range openOrders {
-			if amountToReturn <= 0 {
-				break
-			}
-			deduct := amountToReturn
-			if deduct > row.amount {
-				deduct = row.amount
-			}
-
-			if deduct == row.amount {
-				_, _ = db.Exec(fmt.Sprintf("DELETE FROM bestellungen WHERE id=%v;", row.id))
-			} else {
-				_, _ = db.Exec(fmt.Sprintf("UPDATE bestellungen SET amount=amount-%v WHERE id=%v;", deduct, row.id))
-			}
-			amountToReturn -= deduct
-		}
-	}
-	return nil
-}
-
 //insert a rechnung into the db
 func insertRechnung(req CreateRechnungRequest, db *sql.DB) (int64, error) {
 	data, err := json.Marshal(req.Positionen)
@@ -480,10 +292,10 @@ func getGesamt_KellnerIdFromRechnungnen(db *sql.DB) ([]Rechnung, error) {
 
 //retrieves user info by the user id
 func getUserById(id int, db *sql.DB) (User, error) {
-	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `role` FROM `user` WHERE `id`=%v;", id)
+	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `role`, `token_version` FROM `user` WHERE `id`=%v;", id)
 	rows := db.QueryRow(query)
 	var u User
-	err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Role)
+	err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Role, &u.TokenVersion)
 	if err != nil {
 		return User{}, err
 	}
@@ -492,7 +304,7 @@ func getUserById(id int, db *sql.DB) (User, error) {
 
 //retrieves all users from the db
 func getAllUsers(db *sql.DB) ([]User, error) {
-	query := "SELECT `id`, `username`, `name`, `role` FROM `user`;"
+	query := "SELECT `id`, `username`, `name`, `role`, `token_version` FROM `user`;"
 	rows, err := db.Query(query)
 	if err != nil {
 		return []User{}, err
@@ -501,7 +313,7 @@ func getAllUsers(db *sql.DB) ([]User, error) {
 	users := make([]User, 0)
 	for rows.Next() {
 		var u User
-		err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Role)
+		err := rows.Scan(&u.Id, &u.Username, &u.Name, &u.Role, &u.TokenVersion)
 		if err != nil {
 			return []User{}, err
 		}
@@ -512,10 +324,10 @@ func getAllUsers(db *sql.DB) ([]User, error) {
 
 //retrieve the user info by username from the db
 func getUserByUsername(username string, db *sql.DB) (User, error) {
-	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `password`, `role` FROM `user` WHERE `username`=\"%v\";", username)
+	query := fmt.Sprintf("SELECT `id`, `username`, `name`, `password`, `role`, `token_version` FROM `user` WHERE `username`=\"%v\";", username)
 	row := db.QueryRow(query)
 	var u User
-	err := row.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role)
+	err := row.Scan(&u.Id, &u.Username, &u.Name, &u.Password, &u.Role, &u.TokenVersion)
 	if err != nil {
 		return User{}, err
 	}
@@ -530,9 +342,9 @@ func updateUser(u User, db *sql.DB) error {
 	return updateUserWithPassword(u, db)
 }
 
-//update user info containing also the password
+//update user info containing also the password; increments token_version to invalidate existing sessions
 func updateUserWithPassword(u User, db *sql.DB) error {
-	query := fmt.Sprintf("UPDATE `user` SET `username`=\"%v\", `name`=\"%v\", `password`=\"%v\", `role`=\"%v\" WHERE `id`=%v",
+	query := fmt.Sprintf("UPDATE `user` SET `username`=\"%v\", `name`=\"%v\", `password`=\"%v\", `role`=\"%v\", `token_version`=`token_version`+1 WHERE `id`=%v",
 		u.Username, u.Name, u.Password, u.Role, u.Id)
 	_, err := db.Exec(query)
 	return err
@@ -606,6 +418,77 @@ func resetOrders(db *sql.DB) error {
 func resetAutoIncrementForOrders(db *sql.DB) error {
 	query := "ALTER TABLE `bestellungen` AUTO_INCREMENT = 1;"
 	_, err := db.Exec(query)
+	return err
+}
+
+// ensureEventTable creates the events archive table if it doesn't exist.
+func ensureEventTable(db *sql.DB) error {
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS events (
+		id            INT AUTO_INCREMENT PRIMARY KEY,
+		name          VARCHAR(255) NOT NULL,
+		erstellt_am   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		gesamt        DECIMAL(10,2) NOT NULL,
+		rechnungen    JSON NOT NULL
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+	return err
+}
+
+// insertEvent saves an event snapshot; returns the new ID.
+func insertEvent(name string, gesamt float64, rechnungen []Rechnung, db *sql.DB) (int64, error) {
+	data, err := json.Marshal(rechnungen)
+	if err != nil {
+		return 0, err
+	}
+	res, err := db.Exec(
+		"INSERT INTO events (name, gesamt, rechnungen) VALUES (?, ?, ?)",
+		name, gesamt, string(data),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// getAllEvents returns all archived events (without the full rechnungen payload).
+func getAllEvents(db *sql.DB) ([]ArchivedEvent, error) {
+	rows, err := db.Query("SELECT id, name, erstellt_am, gesamt FROM events ORDER BY erstellt_am DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []ArchivedEvent
+	for rows.Next() {
+		var e ArchivedEvent
+		if err := rows.Scan(&e.Id, &e.Name, &e.ErstelltAm, &e.Gesamt); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	if events == nil {
+		events = []ArchivedEvent{}
+	}
+	return events, nil
+}
+
+// getEventById returns a single event including its full rechnungen snapshot.
+func getEventById(id int, db *sql.DB) (ArchivedEvent, error) {
+	var e ArchivedEvent
+	var raw string
+	err := db.QueryRow(
+		"SELECT id, name, erstellt_am, gesamt, rechnungen FROM events WHERE id=?", id,
+	).Scan(&e.Id, &e.Name, &e.ErstelltAm, &e.Gesamt, &raw)
+	if err != nil {
+		return ArchivedEvent{}, err
+	}
+	if err := json.Unmarshal([]byte(raw), &e.Rechnungen); err != nil {
+		return ArchivedEvent{}, err
+	}
+	return e, nil
+}
+
+// deleteEvent removes an archived event by ID.
+func deleteEvent(id int, db *sql.DB) error {
+	_, err := db.Exec("DELETE FROM events WHERE id=?", id)
 	return err
 }
 

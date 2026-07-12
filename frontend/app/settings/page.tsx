@@ -21,6 +21,7 @@ import {
   Printer,
   Trash2,
   Activity,
+  Archive,
 } from "lucide-react";
 import { fetchPrinterSettings, updatePrinterSettings, DEFAULT_SETTINGS } from "@/lib/printerSettings";
 import type { PrinterSettings, PrinterRule } from "@/lib/printerSettings";
@@ -113,46 +114,54 @@ export default function Settingspage() {
     updatePrinter({ ...printerSettings, rules: printerSettings.rules.filter(r => r.id !== id) });
   }
 
+  // ── Data fetchers (reusable for targeted refreshes) ───────────────────────
+
+  async function fetchCategories() {
+    const res = await fetch("/get/all-categories/");
+    if (!res.ok) throw new Error();
+    const catData: ApiCategory[] = await res.json();
+    const cMap = new Map<string, number>();
+    const rMap = new Map<number, string>();
+    const cats: Category[] = [];
+    catData.forEach(c => {
+      cMap.set(c.category_name, c.category_id);
+      rMap.set(c.category_id, c.category_name);
+      cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
+    });
+    setCategoryMap(cMap);
+    setCategories(cats);
+    return { cMap, rMap };
+  }
+
+  async function fetchProducts(rMap: Map<number, string>) {
+    const res = await fetch("/get/all-products/");
+    if (!res.ok) throw new Error();
+    const prodData: ApiProduct[] = await res.json();
+    setProducts(prodData.map(p => ({
+      id: p.product_id.toString(),
+      name: p.name,
+      category: rMap.get(p.category) || "Unbekannt",
+      price: p.price,
+    })));
+  }
+
+  async function fetchUsers() {
+    const res = await fetch("/get/all-users/");
+    if (!res.ok) throw new Error();
+    const userData: ApiUser[] = await res.json();
+    setUsers(userData.map(u => ({
+      id: u.user_id.toString(),
+      username: u.user_username,
+      password: u.user_password,
+      role: u.user_role,
+    })));
+  }
+
   React.useEffect(() => {
     async function fetchInitialData() {
       try {
-        const catRes = await fetch("/get/all-categories/");
-        const prodRes = await fetch("/get/all-products/");
-        const userRes = await fetch("/get/all-users/");
-
-        if (!catRes.ok || !prodRes.ok || !userRes.ok) throw new Error("Daten konnten nicht vom Server geladen werden.");
-
-        const catData: ApiCategory[] = await catRes.json();
-        const prodData: ApiProduct[] = await prodRes.json();
-        const userData: ApiUser[] = await userRes.json();
-
-        const cMap = new Map<string, number>();
-        const rMap = new Map<number, string>();
-        const cats: Category[] = [];
-
-        catData.forEach(c => {
-          cMap.set(c.category_name, c.category_id);
-          rMap.set(c.category_id, c.category_name);
-          cats.push({ id: c.category_id.toString(), name: c.category_name, color: c.category_color || "#64748b" });
-        });
-
-        setUsers(userData.map(u => (
-          {
-            id: u.user_id.toString(),
-            username: u.user_username,
-            password: u.user_password,
-            role: u.user_role
-          })));
-        setCategoryMap(cMap);
-        setCategories(cats);
-
-        const MAPPED_PRODUCTS: Product[] = prodData.map(p => ({
-          id: p.product_id.toString(),
-          name: p.name,
-          category: rMap.get(p.category) || "Unbekannt",
-          price: p.price,
-        }));
-        setProducts(MAPPED_PRODUCTS);
+        const { rMap } = await fetchCategories();
+        await Promise.all([fetchProducts(rMap), fetchUsers()]);
       } catch (err) {
         console.error(err);
         setError("Fehler beim Verbinden mit dem Server. Bitte lade die Seite neu.");
@@ -161,6 +170,7 @@ export default function Settingspage() {
       }
     }
     fetchInitialData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const allCategoryNames = ["Alle", ...categories.map(c => c.name)];
@@ -172,6 +182,7 @@ export default function Settingspage() {
   // ─── Product actions ───────────────────────────────────────────────────────
 
   async function addProduct(p: Omit<Product, "id">) {
+    setError("");
     try {
       const catId = categoryMap.get(p.category) || 0;
       const res = await fetch("/add/product/", {
@@ -180,13 +191,17 @@ export default function Settingspage() {
         body: JSON.stringify({ price: p.price, name: p.name, category: catId })
       });
       if (!res.ok) throw new Error("Konnte Produkt nicht speichern");
-      window.location.reload();
+      // re-fetch only products to get the new ID assigned by the backend
+      const rMap = new Map<number, string>();
+      categories.forEach(c => rMap.set(parseInt(c.id), c.name));
+      await fetchProducts(rMap);
     } catch (err) {
       setError("Fehler beim Speichern des Produkts");
     }
   }
 
   async function updateProduct(updated: Product) {
+    setError("");
     try {
       const catId = categoryMap.get(updated.category) || 0;
       const res = await fetch("/update/product/", {
@@ -208,6 +223,7 @@ export default function Settingspage() {
   // ─── Category actions ──────────────────────────────────────────────────────
 
   async function addCategory(newCat: Omit<Category, "id">) {
+    setError("");
     const trimmed = newCat.name.trim();
     if (!trimmed || categories.some(c => c.name === trimmed)) return;
     try {
@@ -217,13 +233,15 @@ export default function Settingspage() {
         body: JSON.stringify({ category_name: trimmed, category_color: newCat.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht speichern");
-      window.location.reload();
+      // re-fetch categories to pick up the new ID from the backend
+      await fetchCategories();
     } catch (err) {
       setError("Fehler beim Speichern der Kategorie");
     }
   }
 
   async function updateCategory(updated: Category) {
+    setError("");
     const trimmed = updated.name.trim();
     if (!trimmed) return;
     try {
@@ -233,7 +251,9 @@ export default function Settingspage() {
         body: JSON.stringify({ category_id: parseInt(updated.id), category_name: trimmed, category_color: updated.color })
       });
       if (!res.ok) throw new Error("Konnte Kategorie nicht updaten");
-      window.location.reload();
+      // category name may have changed → re-fetch both so product labels stay in sync
+      const { rMap } = await fetchCategories();
+      await fetchProducts(rMap);
     } catch (err) {
       setError("Fehler beim Updaten der Kategorie");
     }
@@ -246,24 +266,28 @@ export default function Settingspage() {
   // ─── User actions ──────────────────────────────────────────────────────
 
   async function addUser(u: Omit<User, "id">) {
+    setError("");
     try {
       const res = await fetch("/add/user/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_username: u.username, user_password: u.password, user_role: u.role })
       });
+      if (res.status === 409) { setError("Benutzername bereits vergeben"); return; }
       if (!res.ok) throw new Error();
-      window.location.reload();
+      await fetchUsers();
     } catch { setError("Fehler beim Speichern des Nutzers"); }
   }
 
   async function updateUser(updated: User) {
+    setError("");
     try {
       const res = await fetch("/update/user/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: parseInt(updated.id), user_username: updated.username, user_password: updated.password, user_role: updated.role })
       });
+      if (res.status === 409) { setError("Benutzername bereits vergeben"); return; }
       if (!res.ok) throw new Error();
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
     } catch { setError("Fehler beim Updaten des Nutzers"); }
@@ -489,6 +513,21 @@ export default function Settingspage() {
               <div className="flex-1 min-w-0">
                 <p className="text-base font-bold text-foreground">Statistiken</p>
                 <p className="text-xs text-muted-foreground">Umsatz, Kellner, Kategorien & Event-Reset</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+
+            {/* ── Event-Archiv ──────────────────────────────────────────────── */}
+            <button
+              onClick={() => router.push("/admin/events")}
+              className="w-full flex items-center gap-3 bg-card border border-border rounded-2xl px-4 py-4 hover:bg-secondary/30 active:scale-[0.98] transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Archive className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold text-foreground">Event-Archiv</p>
+                <p className="text-xs text-muted-foreground">Vergangene Events & PDF-Export</p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </button>
