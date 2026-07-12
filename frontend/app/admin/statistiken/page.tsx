@@ -217,7 +217,7 @@ export default function StatistikPage() {
     if (!saveEventName.trim()) return;
     setIsSavingEvent(true);
     try {
-      const res = await fetch("/admin/events/", {
+      const res = await fetch("/add/event/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: saveEventName.trim() }),

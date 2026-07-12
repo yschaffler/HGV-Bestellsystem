@@ -973,10 +973,10 @@ func main() {
 	router.HandleFunc("GET /admin/rechnungen/", getAllRechnungenHandler)
 	router.HandleFunc("POST /admin/reset/rechnungen/", resetRechnungenHandler)
 
-	router.HandleFunc("GET /admin/events/", getEventsHandler)
-	router.HandleFunc("POST /admin/events/", createEventHandler)
-	router.HandleFunc("DELETE /admin/events/{id}", deleteEventHandler)
-	router.HandleFunc("GET /admin/events/{id}/pdf/", getEventPDFHandler)
+	router.HandleFunc("GET /get/events/", getEventsHandler)
+	router.HandleFunc("POST /add/event/", createEventHandler)
+	router.HandleFunc("DELETE /delete/event/{id}", deleteEventHandler)
+	router.HandleFunc("GET /get/event-pdf/{id}/", getEventPDFHandler)
 
 	router.Handle("/ws/printer", PrintHub)
 
