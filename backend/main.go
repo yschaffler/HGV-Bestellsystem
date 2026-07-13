@@ -833,11 +833,117 @@ func unsubscribePushHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// ── Event archive handlers ────────────────────────────────────────────────────
+
+func getEventsHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	events, err := getAllEvents(DB)
+	if err != nil {
+		log.Printf("getEventsHandler: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(events)
+}
+
+func createEventHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	rechnungen, err := getAllRechnungen(DB)
+	if err != nil {
+		log.Printf("createEventHandler: getAllRechnungen: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	gesamt := 0.0
+	for _, rec := range rechnungen {
+		gesamt += rec.Gesamt
+	}
+	id, err := insertEvent(req.Name, gesamt, rechnungen, DB)
+	if err != nil {
+		log.Printf("createEventHandler: insertEvent: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{"event_id": id})
+}
+
+func deleteEventHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := deleteEvent(id, DB); err != nil {
+		log.Printf("deleteEventHandler: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func getEventPDFHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	event, err := getEventById(id, DB)
+	if err != nil {
+		log.Printf("getEventPDFHandler: getEventById: %v", err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	m, err := getEventPDF(event)
+	if err != nil {
+		log.Printf("getEventPDFHandler: getEventPDF: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	doc, err := m.Generate()
+	if err != nil {
+		log.Printf("getEventPDFHandler: Generate: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	filename := fmt.Sprintf("event-%s.pdf", event.Name)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
+	w.Write(doc.GetBytes())
+}
+
 //main entrypoint for the program, establishing a database connection, setting up all server endpoints and serving
 func main() {
 	OpenDatabaseHandle()
 	if err := ensurePushTables(DB); err != nil {
 		log.Fatalf("failed to create push tables: %v", err)
+	}
+	if err := ensureEventTable(DB); err != nil {
+		log.Fatalf("failed to create events table: %v", err)
 	}
 	initVAPIDKeys()
 	PrintHub = ws.NewHub(os.Getenv("PRINTER_SECRET"))
@@ -866,6 +972,11 @@ func main() {
 
 	router.HandleFunc("GET /admin/rechnungen/", getAllRechnungenHandler)
 	router.HandleFunc("POST /admin/reset/rechnungen/", resetRechnungenHandler)
+
+	router.HandleFunc("GET /get/events/", getEventsHandler)
+	router.HandleFunc("POST /add/event/", createEventHandler)
+	router.HandleFunc("DELETE /delete/event/{id}", deleteEventHandler)
+	router.HandleFunc("GET /get/event-pdf/{id}/", getEventPDFHandler)
 
 	router.Handle("/ws/printer", PrintHub)
 

@@ -2,6 +2,15 @@ package main
 
 import "time"
 
+// ArchivedEvent is a snapshot of all rechnungen at the time an event was closed.
+type ArchivedEvent struct {
+	Id         int        `json:"event_id"`
+	Name       string     `json:"event_name"`
+	ErstelltAm time.Time  `json:"event_erstellt_am"`
+	Gesamt     float64    `json:"event_gesamt"`
+	Rechnungen []Rechnung `json:"event_rechnungen,omitempty"`
+}
+
 //Type definition for a product as defined in the database schema
 type Product struct {
 	Product_Id int     `json:"product_id"`

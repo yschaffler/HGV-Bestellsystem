@@ -18,6 +18,7 @@ import {
   Tag,
   TableProperties,
   FileDown,
+  Archive,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -31,6 +32,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,6 +137,10 @@ export default function StatistikPage() {
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
+  const [saveEventOpen, setSaveEventOpen] = useState(false);
+  const [saveEventName, setSaveEventName] = useState("");
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+
   // Kategorien: which category is expanded to show products
   const [expandedKat, setExpandedKat] = useState<string | null>(null);
   // Top Produkte: active category filter chip
@@ -197,6 +210,25 @@ export default function StatistikPage() {
       setError("Reset fehlgeschlagen.");
     } finally {
       setIsResetting(false);
+    }
+  }
+
+  async function handleSaveEvent() {
+    if (!saveEventName.trim()) return;
+    setIsSavingEvent(true);
+    try {
+      const res = await fetch("/add/event/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: saveEventName.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setSaveEventOpen(false);
+      setSaveEventName("");
+    } catch {
+      setError("Event konnte nicht gespeichert werden.");
+    } finally {
+      setIsSavingEvent(false);
     }
   }
 
@@ -409,6 +441,9 @@ export default function StatistikPage() {
         </div>
         <Button variant="outline" size="sm" className="text-xs gap-1" onClick={loadRechnungen}>
           <RefreshCcw className="w-3 h-3" /> Aktualisieren
+        </Button>
+        <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => setSaveEventOpen(true)}>
+          <Archive className="w-3 h-3" /> Speichern
         </Button>
         <a href="/get/statistics-pdf/" target="_blank" rel="noopener noreferrer">
           <Button variant="default" size="sm" className="text-xs gap-1">
@@ -903,6 +938,34 @@ export default function StatistikPage() {
         </Card>
 
       </div>
+
+      {/* ── Event speichern Dialog ─────────────────────────────────────────── */}
+      <Dialog open={saveEventOpen} onOpenChange={setSaveEventOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Event speichern</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Alle aktuellen Rechnungen werden als Snapshot unter diesem Namen archiviert.
+          </p>
+          <Input
+            placeholder="z.B. Sommerfest 2025"
+            value={saveEventName}
+            onChange={(e) => setSaveEventName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSaveEvent()}
+            autoFocus
+          />
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSaveEventOpen(false)}>Abbrechen</Button>
+            <Button
+              onClick={handleSaveEvent}
+              disabled={!saveEventName.trim() || isSavingEvent}
+            >
+              {isSavingEvent ? <Loader2 className="w-4 h-4 animate-spin" /> : "Speichern"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
