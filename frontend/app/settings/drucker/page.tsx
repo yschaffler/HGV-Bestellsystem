@@ -1,9 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
-  ChevronLeft,
   PlusCircle,
   Trash2,
   Pencil,
@@ -131,7 +129,6 @@ function RuleForm({
 }
 
 export default function DruckerPage() {
-  const router = useRouter();
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_SETTINGS);
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -224,20 +221,15 @@ export default function DruckerPage() {
   const rules = printerSettings.rules;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="rounded-full shrink-0" onClick={() => router.push("/settings")}>
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Drucker</h1>
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Einstellungen</p>
-        </div>
+    <div className="min-h-full">
+      {/* Desktop page title */}
+      <div className="hidden md:block px-6 pt-6 pb-2">
+        <h1 className="text-xl font-bold tracking-tight">Drucker</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">Regeln, Routen und Warteschlangen verwalten</p>
       </div>
 
       {/* Section toggle */}
-      <div className="max-w-lg mx-auto px-4 pt-4">
+      <div className="max-w-2xl mx-auto px-4 pt-4 md:px-6">
         <div className="flex bg-muted rounded-xl p-1 gap-1">
           <button
             onClick={() => setActiveSection("regeln")}
@@ -254,7 +246,7 @@ export default function DruckerPage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4">
+      <div className="max-w-2xl mx-auto px-4 py-4 md:px-6">
 
         {/* ── Regeln ────────────────────────────────────────────────────────── */}
         {activeSection === "regeln" && (

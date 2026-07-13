@@ -1,8 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, PlusCircle } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import type { User, DeleteDialog, ApiUser } from "@/app/settings/types";
@@ -11,7 +10,6 @@ import { UserRow } from "@/components/settings/UserRow";
 import { DeleteConfirmDialog } from "@/components/settings/DeleteConfirmDialog";
 
 export default function NutzerPage() {
-  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialog>(null);
@@ -93,20 +91,15 @@ export default function NutzerPage() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="rounded-full shrink-0" onClick={() => router.push("/settings")}>
-            <ChevronLeft className="w-6 h-6" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Nutzer</h1>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Einstellungen</p>
-          </div>
+      <div className="min-h-full">
+        {/* Desktop page title */}
+        <div className="hidden md:block px-6 pt-6 pb-2">
+          <h1 className="text-xl font-bold tracking-tight">Nutzer</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Accounts, Rollen und Passwörter verwalten</p>
         </div>
 
         {error && (
-          <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center sticky top-14 z-10">
+          <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center">
             {error}
           </div>
         )}
@@ -116,7 +109,7 @@ export default function NutzerPage() {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
           </div>
         ) : (
-          <div className="max-w-lg mx-auto px-4 py-4 flex flex-col gap-3">
+          <div className="max-w-2xl mx-auto px-4 py-4 md:px-6 flex flex-col gap-3">
             {users.length === 0 && !showAddUser && (
               <p className="py-10 text-center text-muted-foreground text-sm opacity-50">Noch keine Nutzer angelegt</p>
             )}

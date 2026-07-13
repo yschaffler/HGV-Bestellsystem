@@ -1,8 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, PlusCircle, UtensilsCrossed, Layers, ChevronUp, ChevronDown } from "lucide-react";
+import { PlusCircle, UtensilsCrossed, Layers, ChevronUp, ChevronDown } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -14,7 +13,6 @@ import { CategoryRow } from "@/components/settings/CategoryRow";
 import { DeleteConfirmDialog } from "@/components/settings/DeleteConfirmDialog";
 
 export default function ProduktePage() {
-  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryMap, setCategoryMap] = useState<Map<string, number>>(new Map());
@@ -200,26 +198,21 @@ export default function ProduktePage() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="rounded-full shrink-0" onClick={() => router.push("/settings")}>
-            <ChevronLeft className="w-6 h-6" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Produkte & Kategorien</h1>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Einstellungen</p>
-          </div>
+      <div className="min-h-full">
+        {/* Desktop page title */}
+        <div className="hidden md:block px-6 pt-6 pb-2">
+          <h1 className="text-xl font-bold tracking-tight">Produkte & Kategorien</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Artikel, Preise und Produktgruppen verwalten</p>
         </div>
 
         {error && (
-          <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center sticky top-14 z-10">
+          <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center">
             {error}
           </div>
         )}
 
         {/* Section toggle */}
-        <div className="max-w-lg mx-auto px-4 pt-4">
+        <div className="max-w-2xl mx-auto px-4 pt-4 md:px-6">
           <div className="flex bg-muted rounded-xl p-1 gap-1">
             <button
               onClick={() => setActiveSection("produkte")}
@@ -245,7 +238,7 @@ export default function ProduktePage() {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
           </div>
         ) : (
-          <div className="max-w-lg mx-auto px-4 py-4">
+          <div className="max-w-2xl mx-auto px-4 py-4 md:px-6">
 
             {/* ── Produkte ──────────────────────────────────────────────────── */}
             {activeSection === "produkte" && (
