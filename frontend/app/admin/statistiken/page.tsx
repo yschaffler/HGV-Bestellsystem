@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-  ChevronLeft,
   Loader2,
   Receipt,
   RefreshCcw,
@@ -415,53 +414,45 @@ export default function StatistikPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="flex h-full min-h-[60vh] items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-muted/10 pb-20">
-
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b px-4 py-3 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          className="w-10 h-10 p-0 mr-2 rounded-full"
-          onClick={() => router.push("/settings")}
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
-        <div className="flex-1">
+    <div className="pb-12">
+      {/* Sticky page header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 md:px-6 py-3 flex items-center gap-2">
+        <div className="flex-1 hidden md:block">
           <h1 className="text-xl font-bold tracking-tight">Statistiken</h1>
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-            Event-Auswertung
-          </p>
+          <p className="text-xs text-muted-foreground">Event-Auswertung</p>
         </div>
-        <Button variant="outline" size="sm" className="text-xs gap-1" onClick={loadRechnungen}>
-          <RefreshCcw className="w-3 h-3" /> Aktualisieren
-        </Button>
-        <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => setSaveEventOpen(true)}>
-          <Archive className="w-3 h-3" /> Speichern
-        </Button>
-        <a href="/get/statistics-pdf/" target="_blank" rel="noopener noreferrer">
-          <Button variant="default" size="sm" className="text-xs gap-1">
-            <FileDown className="w-3 h-3" /> PDF
+        <div className="flex items-center gap-2 ml-auto">
+          <Button variant="outline" size="sm" className="text-xs gap-1 h-8" onClick={loadRechnungen}>
+            <RefreshCcw className="w-3 h-3" /> <span className="hidden sm:inline">Aktualisieren</span>
           </Button>
-        </a>
+          <Button variant="outline" size="sm" className="text-xs gap-1 h-8" onClick={() => setSaveEventOpen(true)}>
+            <Archive className="w-3 h-3" /> <span className="hidden sm:inline">Speichern</span>
+          </Button>
+          <a href="/get/statistics-pdf/" target="_blank" rel="noopener noreferrer">
+            <Button variant="default" size="sm" className="text-xs gap-1 h-8">
+              <FileDown className="w-3 h-3" /> PDF
+            </Button>
+          </a>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center sticky top-14 z-10">
+        <div className="bg-destructive text-destructive-foreground px-4 py-2 font-bold text-center">
           {error}
         </div>
       )}
 
-      <div className="max-w-lg mx-auto px-4 pt-6 flex flex-col gap-6">
+      <div className="px-4 md:px-6 pt-6 flex flex-col gap-6 max-w-5xl mx-auto">
 
         {/* ── KPI Cards ────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard
             label="Umsatz"
             value={fmt(umsatz)}
@@ -486,6 +477,8 @@ export default function StatistikPage() {
           />
         </div>
 
+        {/* ── Kellner + Tisch side-by-side on desktop ──────────────────────── */}
+        <div className="grid md:grid-cols-2 gap-6">
         {/* ── Kellner Übersicht ─────────────────────────────────────────────── */}
         {kellnerStats.length > 0 && (
           <Card>
@@ -557,6 +550,8 @@ export default function StatistikPage() {
             </CardContent>
           </Card>
         )}
+
+        </div>{/* end 2-col grid */}
 
         {/* ── Kategorien (expandable with products) ────────────────────────── */}
         {katStats.length > 0 && (

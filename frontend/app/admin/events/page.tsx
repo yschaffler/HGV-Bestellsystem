@@ -4,14 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-  ChevronLeft,
-  Loader2,
-  FileDown,
-  Trash2,
-  Archive,
-  CalendarDays,
-} from "lucide-react";
+import { Loader2, FileDown, Trash2, Archive, CalendarDays } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,17 +83,12 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b border-border flex items-center gap-3 px-4 py-3">
-        <Button variant="ghost" size="icon" className="rounded-full shrink-0" onClick={() => router.push("/settings")}>
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
-        <div className="flex-1">
+    <div>
+      {/* Desktop sticky header */}
+      <div className="hidden md:flex sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4 items-center justify-between gap-4">
+        <div>
           <h1 className="text-xl font-bold tracking-tight">Event-Archiv</h1>
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-            Gespeicherte Events
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">Gespeicherte Event-Snapshots</p>
         </div>
       </div>
 
@@ -110,7 +98,7 @@ export default function EventsPage() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="px-4 md:px-6 py-6 space-y-4 max-w-4xl mx-auto">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -126,12 +114,13 @@ export default function EventsPage() {
                 Auf der Statistikseite kannst du den aktuellen Stand als Event archivieren.
               </p>
               <Button variant="outline" size="sm" onClick={() => router.push("/admin/statistiken")}>
-                Zur Statistikseite
+                Zu den Statistiken
               </Button>
             </CardContent>
           </Card>
         ) : (
-          events.map((event) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {events.map((event) => (
             <Card key={event.event_id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
@@ -184,7 +173,8 @@ export default function EventsPage() {
                 </AlertDialog>
               </CardContent>
             </Card>
-          ))
+          ))}
+          </div>
         )}
       </div>
     </div>

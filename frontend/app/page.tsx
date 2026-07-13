@@ -55,7 +55,7 @@ export default function Homepage() {
           {/* Settings */}
           <Button
             variant="outline"
-            onClick={() => router.push("/settings")}
+            onClick={() => router.push("/admin")}
             className="h-32 sm:h-40 md:h-48 rounded-2xl text-lg sm:text-xl font-bold flex flex-col gap-2 border-2 active:bg-accent active:scale-95 transition-transform"
             disabled={user !== null && user.role !== "ADMIN"}
           >
