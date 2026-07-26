@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check, X, Eye, EyeOff } from "lucide-react";
-import type { User } from "@/app/settings/types";
+import type { User } from "@/app/admin/types";
 
 export type UserFormProps = {
   initial?: Partial<User>;

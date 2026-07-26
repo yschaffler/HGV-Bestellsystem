@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { fetchPrinterSettings, updatePrinterSettings, DEFAULT_SETTINGS } from "@/lib/printerSettings";
 import type { PrinterSettings, PrinterRule } from "@/lib/printerSettings";
-import type { ApiUser, User } from "@/app/settings/types";
+import type { ApiUser, User } from "@/app/admin/types";
 import { PrinterQueueMonitor } from "@/components/settings/PrinterQueueMonitor";
 
 type RuleFormState = {
@@ -163,9 +163,9 @@ export default function DruckerPage() {
         </div>
       </div>
 
-      <div className="px-4 py-4 md:px-6 pb-8">
+      <div className="px-4 py-4 md:px-6 pb-8 w-full">
         {activeSection === "regeln" && (
-          <div className="flex flex-col gap-4 max-w-2xl">
+          <div className="flex flex-col gap-4">
             {/* Bar-Orders toggle */}
             <div className="flex items-center justify-between gap-3 bg-card border rounded-2xl px-4 py-3">
               <div>

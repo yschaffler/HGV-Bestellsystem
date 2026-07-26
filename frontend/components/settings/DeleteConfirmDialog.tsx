@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
-import type { DeleteDialog } from "@/app/settings/types";
+import type { DeleteDialog } from "@/app/admin/types";
 
 export type DeleteConfirmDialogProps = {
   dialog: DeleteDialog;

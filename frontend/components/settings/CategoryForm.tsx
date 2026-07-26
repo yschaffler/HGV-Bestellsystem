@@ -12,7 +12,7 @@ import {
   ColorPickerFormat,
 } from "@/components/ui/color-picker";
 import Color from "color";
-import type { Category } from "@/app/settings/types";
+import type { Category } from "@/app/admin/types";
 
 const PRESET_COLORS = [
   "#ef4444", "#f97316", "#f59e0b", "#84cc16",

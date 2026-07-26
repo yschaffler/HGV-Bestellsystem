@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { ProductForm } from "@/components/settings/ProductForm";
-import type { Product } from "@/app/settings/types";
+import type { Product } from "@/app/admin/types";
 
 export type ProductRowProps = {
   product: Product;
