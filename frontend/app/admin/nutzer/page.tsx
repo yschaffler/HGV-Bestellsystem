@@ -16,7 +16,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PlusCircle, Pencil, Trash2, Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-react";
-import type { User, ApiUser } from "@/app/settings/types";
+import type { User, ApiUser } from "@/app/admin/types";
 
 // ── Dialog ────────────────────────────────────────────────────────────────────
 

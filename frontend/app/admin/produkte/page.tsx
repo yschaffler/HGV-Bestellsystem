@@ -18,7 +18,7 @@ import {
   PlusCircle, Pencil, Trash2, ChevronUp, ChevronDown,
   UtensilsCrossed, Layers, CheckCircle2, Loader2,
 } from "lucide-react";
-import type { Product, Category, ApiProduct, ApiCategory } from "@/app/settings/types";
+import type { Product, Category, ApiProduct, ApiCategory } from "@/app/admin/types";
 
 // ── Product Dialog ─────────────────────────────────────────────────────────────
 
