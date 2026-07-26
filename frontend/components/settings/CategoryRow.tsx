@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CategoryForm } from "@/components/settings/CategoryForm";
-import type { Category } from "@/app/settings/types";
+import type { Category } from "@/app/admin/types";
 
 export type CategoryRowProps = {
   category: Category;

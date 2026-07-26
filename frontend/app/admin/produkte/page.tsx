@@ -5,7 +5,7 @@ import { PlusCircle, UtensilsCrossed, Layers, ChevronUp, ChevronDown } from "luc
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import type { Product, Category, DeleteDialog, ApiProduct, ApiCategory } from "@/app/settings/types";
+import type { Product, Category, DeleteDialog, ApiProduct, ApiCategory } from "@/app/admin/types";
 import { ProductForm } from "@/components/settings/ProductForm";
 import { ProductRow } from "@/components/settings/ProductRow";
 import { CategoryForm } from "@/components/settings/CategoryForm";

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { UserForm } from "@/components/settings/UserForm";
-import type { User } from "@/app/settings/types";
+import type { User } from "@/app/admin/types";
 
 export type UserRowProps = {
   user: User;

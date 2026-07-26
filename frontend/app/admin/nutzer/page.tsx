@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import type { User, DeleteDialog, ApiUser } from "@/app/settings/types";
+import type { User, DeleteDialog, ApiUser } from "@/app/admin/types";
 import { UserForm } from "@/components/settings/UserForm";
 import { UserRow } from "@/components/settings/UserRow";
 import { DeleteConfirmDialog } from "@/components/settings/DeleteConfirmDialog";
