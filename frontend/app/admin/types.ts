@@ -15,7 +15,7 @@ export type User = {
   id: string;
   username: string;
   password: string;
-  role: "ADMIN" | "KELLNER";
+  role: "ADMIN" | "KELLNER" | "BAR";
 };
 
 export type DeleteDialog =
@@ -29,7 +29,7 @@ export type ApiUser = {
   user_username: string;
   user_password: string;
   user_realname: string;
-  user_role: "ADMIN" | "KELLNER"
+  user_role: "ADMIN" | "KELLNER" | "BAR"
 };
 
 export type ApiCategory = { 

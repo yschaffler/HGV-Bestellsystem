@@ -31,6 +31,35 @@ func getProducts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	// apply saved product order if present
+	if orderJSON, err := getAppConfig(DB, "product_order"); err == nil && orderJSON != "" {
+		var ids []int
+		if json.Unmarshal([]byte(orderJSON), &ids) == nil {
+			idIdx := make(map[int]int, len(ids))
+			for i, id := range ids {
+				idIdx[id] = i
+			}
+			// sort: products with a known position first, then unordered at the end
+			ordered := make([]Product, 0, len(products))
+			unordered := []Product{}
+			bucket := make([]Product, len(ids))
+			placed := make([]bool, len(ids))
+			for _, p := range products {
+				if i, ok := idIdx[p.Product_Id]; ok {
+					bucket[i] = p
+					placed[i] = true
+				} else {
+					unordered = append(unordered, p)
+				}
+			}
+			for i, ok := range placed {
+				if ok {
+					ordered = append(ordered, bucket[i])
+				}
+			}
+			products = append(ordered, unordered...)
+		}
+	}
 	data, err := json.Marshal(products)
 	if err != nil {
 		log.Printf("error: %v", err)
@@ -39,6 +68,23 @@ func getProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
+}
+
+func updateProductOrderHandler(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Order []int `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	data, _ := json.Marshal(body.Order)
+	if err := setAppConfig(DB, "product_order", string(data)); err != nil {
+		log.Printf("error saving product_order: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func addProduct(w http.ResponseWriter, r *http.Request) {
@@ -960,6 +1006,7 @@ func main() {
 	router.HandleFunc("/add/user/", createUserHandler)
 
 	router.HandleFunc("/update/product/", updateProductHandler)
+	router.HandleFunc("POST /update/product-order/", updateProductOrderHandler)
 	router.HandleFunc("/update/category/", updateCategoryHandler)
 	router.HandleFunc("/update/user/", updateUserHandler)
 

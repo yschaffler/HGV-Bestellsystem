@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check, X } from "lucide-react";
-import type { Product } from "@/app/settings/types";
+import type { Product } from "@/app/admin/types";
 
 export type ProductFormProps = {
   initial?: Partial<Product>;
