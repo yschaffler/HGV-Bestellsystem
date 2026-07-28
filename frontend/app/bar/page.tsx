@@ -157,7 +157,7 @@ export default function BarPage() {
       setIsSuccess(false);
       setIsCheckoutOpen(false);
       setCart([]);
-    }, 1500);
+    }, 500);
   }
 
   const handleNumpadClick = (val: string) => {
